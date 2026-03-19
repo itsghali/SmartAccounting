@@ -1,0 +1,214 @@
+AUDIT FINAL RIGOUREUX — EASYACCOUNTING
+1. RESUME EXECUTIF
+Niveau de maturite : Prototype fonctionnel avance — ~20-25% d'un MVP ERP complet.
+
+Ce qui est reel et solide : Le socle comptable de base fonctionne (saisie equilibree, validation, contrepassation, periodes, audit log). Le dashboard a ete corrige pour afficher de vraies metriques. Le seed PCM/CGNC et les journaux par defaut existent. Les 4 etats financiers (balance, grand livre, bilan, CPC) ont des endpoints backend et des pages frontend.
+
+Ce qui est trompeur : Les 6 fichiers markdown (PRD, Architecture Fonctionnelle, Architecture Technique, Backlog) decrivent un ERP complet de ~80 modeles DB et 28 blocs fonctionnels. Le code reel ne contient que 20 tables, 5 routers, et 9 pages frontend. L'ecart entre la documentation et l'implementation reelle est d'environ 75-80%.
+
+Principaux risques :
+
+Aucun test n'a ete mis a jour depuis le starter initial (6 tests basiques seulement)
+Le seed PCM n'a jamais ete teste en production (risque de UniqueConstraint si un dossier existant a deja des comptes)
+Les 4 etats financiers (balance, grand livre, bilan, CPC) n'ont aucun test unitaire
+Le reporting ne respecte pas le RLS (filtrage tenant_id par code, pas par politique PostgreSQL)
+0% de la paie, 0% du commercial, 0% des immobilisations, 0% de l'analytique, 0% de la TVA
+2. VERIFICATION DES ERREURS DEJA SIGNALEES
+Erreur / Lacune	Statut	Preuve	Commentaire
+Dashboard tirets "—" au lieu de metriques	Corrige	dashboard/page.tsx:31-36 — useQuery sur /accounting/dashboard-stats	Endpoint backend + frontend branches, 8 KPI reels + 4 secondaires
+Pas de chiffres plan comptable	Corrige	accounts_count dans DashboardStats	Via get_dashboard_stats()
+Pas de chiffres journaux	Corrige	journals_count dans DashboardStats	Via get_dashboard_stats()
+Pas de chiffres exercices	Corrige	fiscal_years_count dans DashboardStats	Via get_dashboard_stats()
+Pas de chiffres ecritures	Corrige	entries_count, draft_entries_count, validated_entries_count	Detail brouillard/validees inclus
+Activite recente vide	Corrige	dashboard/page.tsx:38-43 — useQuery sur /core/audit-logs?limit=10	Timeline coloree avec labels francais
+Seed PCM/CGNC manquant	Corrige	seed.py — ~170 comptes classes 1-9	Auto-hook dans create_dossier() et register_user()
+Seed journaux manquant	Corrige	seed.py — 8 journaux par defaut	AC, VT, TR, BQ, CS, OD, AN, ST
+Reporting absent	Corrige	reporting.py + reporting_router.py	Balance, Grand Livre, Bilan, CPC — 4 endpoints + 4 pages
+Page Parametres placeholder	Non corrige	settings/page.tsx — 17 lignes, texte placeholder	Toujours "sera developpe dans les prochains sprints"
+TVA absente	Non corrige	Seul default_tva_rate sur Account	Aucun module, aucune declaration, aucun calcul
+Cloture exercice absente	Non corrige	Seul lock_period existe	Pas de cloture exercice, pas d'a-nouveaux, pas de reouverture
+A-nouveaux absents	Non corrige	Aucun code	Workflow inexistant
+Moteur de regles absent	Non corrige	Aucun code	events.py existe mais n'est utilise nulle part
+RLS PostgreSQL absent	Non corrige	Filtrage WHERE tenant_id = partout	Pas de CREATE POLICY, pas de ROW LEVEL SECURITY
+Audit log partiel	Partiellement corrige	Log sur entries (CREATE/VALIDATE/REVERSE) seulement	Pas de log sur comptes, journaux, periodes, dossiers
+Pagination/filtres manquants	Non corrige	PaginationParams existe dans pagination.py mais n'est utilise nulle part	Toutes les listes retournent la totalite sans pagination
+Documents/GED sans logique	Non corrige	Modeles Document et DocumentLink en DB, zero endpoint	Tables creees par migration mais inaccessibles
+EventBus inutilise	Non corrige	events.py — code correct mais zero subscribe() ou publish() dans le projet	Dead code
+Import ecritures absent	Non corrige	Aucun code	Ni CSV ni Excel
+Modeles d'ecritures absents	Non corrige	Aucun code	Pas de templates
+3. VERIFICATION DES 7 PROMPTS
+Prompt	Attendu	Implemente	Partiel	Manquant	Verdict
+1 — PRD	Cadrage strategie, personas, modules, UX	Fichier PRD_EasyAccounting.md (document)	—	Implementation = 0	Document seulement
+2 — Architecture fonctionnelle	14 domaines fonctionnels decrits	Fichier ARCHITECTURE_FONCTIONNELLE.md	—	Implementation = 0	Document seulement
+3 — Architecture technique	~80 modeles, moteur de regles, events, RLS	20 tables reelles, EventBus dead code, 0 RLS	Modeles de base	60+ modeles, RLS, moteur regles	~25% implemente
+4 — Backlog/Roadmap	28 blocs, 230 user stories	Fichier BACKLOG_ROADMAP.md	—	0 tracking dans le code	Document seulement
+5 — Starter code	Monorepo structure, Docker, auth, base	Docker 5 services, auth JWT, CRUD base	Tout le socle	—	Correctement implemente
+6 — Build modules	Comptabilite complete + reporting + debut autres modules	Saisie, validation, contrepassation, 4 etats financiers, seed PCM	Balance/GL/Bilan/CPC	TVA, cloture, immobilisations, paie, commercial, analytique, budgets	~30% implemente
+7 — Audit + reprise	Dashboard corrige, seed, reporting, plan de build	Dashboard branche, seed PCM, 4 reports	—	Cloture, TVA, parametres	~60% de ce prompt implemente
+Synthese critique : Les prompts 1-4 ont produit exclusivement des documents markdown, jamais traduits en code. Le prompt 5 a produit un starter reel et fonctionnel. Les prompts 6-7 ont commence a construire mais couvrent seulement la comptabilite de base + reporting.
+
+4. AUDIT PAR DOMAINE FONCTIONNEL
+Domaine	Etat reel	Maturite	Coherence cahier des charges	Risques
+Socle plateforme	Docker, config, middleware, health	70%	Partiel — pas de RLS, pas de rate limiting	Securite multi-tenant faible
+Auth	JWT, register, login, me, refresh	80%	Conforme pour MVP	Secret key en dur dans config.py
+RBAC	Modele Role/Permission, require_permission	40%	Structure OK, aucune permission seedee	require_permission jamais utilise sur aucune route
+Multi-tenant	tenant_id sur chaque table + WHERE	50%	Fonctionnel mais pas RLS	Un bug dans le service = fuite de donnees
+Societes / Dossiers	CRUD complet	80%	Conforme	—
+Exercices / Periodes	Creation + periodes auto + OD + lock	70%	Bon	Pas de cloture ni reouverture
+Audit log	Log CREATE/VALIDATE/REVERSE sur entries	30%	Partiel	Ne trace pas comptes, journaux, dossiers, periodes
+Documents	Modeles DB uniquement	5%	Insuffisant	Zero upload, zero download, zero liaison
+Notifications	Neant	0%	Absent	—
+Comptabilite	Saisie, validation, contrepassation, equilibre	60%	Bon pour le coeur	Pas d'import, pas de modeles d'ecritures
+TVA	Champ default_tva_rate sur Account	3%	Absent	Aucun module
+Cloture	lock_period seulement	10%	Insuffisant	Pas de cloture exercice, pas d'a-nouveaux
+Reporting	Balance, Grand Livre, Bilan, CPC	50%	Partiellement conforme	Pas d'ESG, pas de TFP, pas de liasse, pas d'export PDF
+Immobilisations	Neant	0%	Absent	—
+Analytique	Neant	0%	Absent	—
+Budgets	Neant	0%	Absent	—
+Paie	Neant	0%	Absent	—
+Declarations sociales	Neant	0%	Absent	—
+Commercial	ThirdParty basique	5%	Insuffisant	Pas de produits, devis, factures, stock
+Stock	Neant	0%	Absent	—
+Moteur de regles	EventBus dead code	2%	Absent	Infrastructure presente mais zero utilisation
+IA transverse	Neant	0%	Absent	—
+5. AUDIT DE CONFORMITE AU CAHIER DES CHARGES
+Bloc attendu	Statut reel	Conformite	Ecart
+SaaS multi-tenant cloud	Oui (Docker, tenant_id)	Partiel	Pas de RLS, pas de plan/billing
+Auth + RBAC complet	Auth OK, RBAC non exploite	Partiel	Permissions non seedees, require_permission jamais appele
+Comptabilite CGNC complete	Saisie + validation + report basiques	Partiel	Manque import, modeles, lettrage, rapprochement
+TVA marocaine	Champ taux seulement	Non conforme	Module entier absent
+Cloture + a-nouveaux	Lock period seulement	Non conforme	Workflow complet absent
+Immobilisations / amortissements	Neant	Non conforme	Module entier absent
+Analytique multi-axes	Neant	Non conforme	Module entier absent
+Budgets previsionnels	Neant	Non conforme	Module entier absent
+Reporting reglementaire complet	Balance + GL + Bilan + CPC	Partiel	Manque ESG, TFP, liasse, export PDF
+Paie marocaine complete	Neant	Non conforme	Module entier absent
+DAMANCOM / Etat 9421 / BDS	Neant	Non conforme	—
+Gestion commerciale	ThirdParty basique	Non conforme	Pas de produits/devis/factures/stock
+Documents / GED	Modele DB sans logique	Non conforme	Zero fonctionnalite
+Moteur de regles	Dead code	Non conforme	—
+IA transverse	Neant	Non conforme	—
+Export PDF / Excel	Neant	Non conforme	—
+6. AUDIT CONFORMITE ATLAS
+AtlasCompta
+Fonction	Statut
+Plan comptable PCM pre-charge	Couvert — seed 170 comptes
+Journaux standards	Couvert — 8 journaux auto
+Saisie multi-lignes equilibree	Couvert
+Validation brouillard/valide	Couvert
+Contrepassation	Couvert
+Balance generale	Couvert
+Grand livre	Couvert
+Bilan	Couvert (simplifie)
+CPC	Couvert
+Exercices + periodes auto	Couvert
+Import Excel ecritures	Absent
+Modeles d'ecritures	Absent
+Duplication d'ecritures	Absent
+TVA automatique	Absent
+Immobilisations	Absent
+Analytique	Absent
+Budgets	Absent
+Liasse fiscale	Absent
+ESG / TFP	Absent
+Lettrage	Absent (schema lettrage_code existe)
+Rapprochement bancaire	Absent
+Cloture / a-nouveaux	Absent
+Securite par profil	Partiel (RBAC non exploite)
+Export PDF	Absent
+Verdict AtlasCompta : ~35% couvert
+
+AtlasPaie
+Verdict : 0% couvert — aucun modele, aucune logique, aucune page
+
+AtlasCom
+Verdict : ~3% couvert — seul ThirdParty avec champs basiques (ICE, IF, RC)
+
+7. AUDIT CONFORMITE MAROCAINE
+Exigence marocaine	Statut
+PCM / CGNC classes 1-9	Conforme — seed 170 comptes couvrant les 9 classes
+Classe 0 engagements hors bilan	Partiellement — comptes 9810/9820 en classe 9
+Exercices comptables	Conforme — creation + 12 periodes + OD
+Journaux reglementaires	Conforme — 8 types seeds
+Numerotation chronologique	Conforme — JOURNAL-PERIODE-SEQUENCE
+Equilibre debit/credit	Conforme — controle strict
+Immutabilite ecritures validees	Conforme — ImmutableEntryError
+Contrepassation (pas de suppression)	Conforme
+TVA marocaine (20/14/10/7/0%)	Non conforme — champ taux seulement
+Declaration TVA	Non conforme
+Credit TVA	Non conforme
+Bilan CGNC	Partiellement conforme — structure simplifiee
+CPC CGNC	Partiellement conforme — 7 sections, pas 100% detaille
+ESG	Non conforme
+Tableau de financement	Non conforme
+Comptes personnel (617x)	Conforme — dans le seed PCM
+Organismes sociaux (4438x)	Conforme — CNSS/CIMR/AMO/mutuelle dans le seed
+Cotisations sociales (6174x)	Conforme — dans le seed PCM
+Immobilisations / amortissements	Non conforme
+Paie marocaine	Non conforme
+CNSS / AMO / CIMR	Comptes existent, aucun calcul
+IR progressif	Non conforme
+DAMANCOM	Non conforme
+Etat 9421	Non conforme
+BDS	Non conforme
+Liasse fiscale	Non conforme
+EDI XML	Non conforme
+8. CE QUI EST REELLEMENT PRET
+Socle technique — Docker, FastAPI async, SQLAlchemy 2 avec lazy="raise", JWT auth, session management
+Auth + registration — Workflow complet register → login → JWT → protected routes
+Multi-tenant basique — Middleware + filtrage tenant_id
+Gestion dossiers — CRUD + dossier switcher frontend
+Exercices + periodes — Creation auto 12 mois + OD, verrouillage periode
+Comptabilite coeur — Saisie multi-lignes, equilibre debit/credit, validation, contrepassation, piece number auto
+Seed PCM — 170 comptes CGNC + 8 journaux auto-hook dans creation dossier
+Dashboard vivant — 8+4 KPI reels + activite recente
+Reporting de base — Balance generale, Grand livre, Bilan, CPC avec filtres exercice
+UI shell — Sidebar 9 items, layout propre, dossier switcher, data-table composant reutilisable
+9. CE QUI EST TROMPEUR OU INCOMPLET
+Element	Probleme
+4 markdown strategiques (PRD, Archi Fonc, Archi Tech, Backlog)	Decrivent un ERP de 80+ tables et 28 blocs. Le code reel = 20 tables, 5 modules. Ecart = 75%
+RBAC	Modele complet (Role, Permission, RolePermission, UserRole, UserDossierAssignment) mais require_permission() n'est appele sur aucune route. Toutes les routes n'utilisent que get_current_user. RBAC est une facade
+EventBus	Code propre, instances, types — mais zero subscribe, zero publish dans tout le projet. Dead code
+PaginationParams	Classe Pydantic existante, jamais importee, jamais utilisee. Toutes les listes retournent tout
+Document / DocumentLink	Tables creees en migration, modeles ORM existants, mais zero endpoint, zero upload, zero download
+case/and_ imports dans reporting.py	case et and_ importes de sqlalchemy mais jamais utilises — imports morts
+Bilan simplifie	Decrit comme "Bilan CGNC" mais la logique est un groupement basique par classe, pas un vrai bilan 5 masses avec amortissements nets
+Tests	6 tests basiques du starter initial. Zero test pour : seed PCM, dashboard stats, reporting, balance, grand livre, bilan, CPC
+Secret key	"CHANGE-ME-IN-PRODUCTION-USE-OPENSSL-RAND" en dur dans config.py, pas dans .env
+Seed sur dossier existant	Endpoint POST /seed-defaults n'a aucune protection contre le double-seed (unique constraint crash si comptes deja presents)
+10. CE QU'IL FAUT CORRIGER IMMEDIATEMENT
+Critique (bloquant la fiabilite)
+Proteger le seed contre les doublons — POST /seed-defaults crashera si les comptes existent deja
+Corriger les imports morts dans reporting.py (case, and_ inutilises)
+Ajouter des tests pour le reporting (au minimum balance generale)
+Activer RBAC sur les routes — au moins require_permission("comptabilite.write") sur les mutations
+Important (dette technique a adresser)
+Pagination reelle — utiliser le PaginationParams existant sur toutes les listes
+Audit log complet — tracer comptes, journaux, periodes, dossiers, pas juste les entries
+Securiser la secret key — lire depuis .env, pas en dur
+Export PDF des etats financiers (balance, GL, bilan, CPC)
+Moyen (fonctionnalite attendue)
+Page Parametres reelle — settings du dossier (devise, exercice par defaut)
+Cloture exercice — workflow complet avec a-nouveaux
+Module TVA — declaration, taux, calcul
+Lettrage — logique de rapprochement des lignes
+Secondaire (pour la suite)
+Supprimer le dead code (EventBus non utilise, imports morts)
+Immobilisations
+Analytique
+Paie (gros module a part)
+11. PLAN D'ACTION CORRIGE
+Sprint	Contenu	Pre-requis
+Sprint 4 (maintenant)	Fix seed doublons + import morts + tests reporting + RBAC actif sur routes	Aucun
+Sprint 5	Pagination listes + audit log etendu + export PDF etats	Sprint 4
+Sprint 6	Cloture exercice + generation a-nouveaux + reouverture	Sprint 4
+Sprint 7	Module TVA (taux, declaration, credit, liquidation)	Sprint 6
+Sprint 8	Lettrage + rapprochement bancaire	Sprint 4
+Sprint 9	Import ecritures (CSV/Excel) + modeles d'ecritures	Sprint 4
+Sprint 10	Immobilisations + amortissements	Sprint 6
+Sprint 11	Analytique multi-axes + budgets	Sprint 10
+Sprint 12	Paie marocaine (salaries, rubriques, calcul, bulletins)	Sprint 6
+Sprint 13	Paie suite (DAMANCOM, etat 9421, BDS)	Sprint 12
+Sprint 14	Commercial (clients, produits, devis, factures)	Sprint 7
+Sprint 15	Stock + documents/GED	Sprint 14
+Sprint 16	IA transverse (OCR, suggestions)	Sprint 15

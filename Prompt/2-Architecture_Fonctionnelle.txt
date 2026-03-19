@@ -1,0 +1,104 @@
+Tu es un expert senior en architecture fonctionnelle ERP, comptabilité marocaine, paie marocaine, gestion commerciale, fiscalité et modélisation métier.
+
+À partir du PRD déjà défini pour EASYACCOUNTING, je veux maintenant une **architecture fonctionnelle complète et détaillée** du SaaS.
+
+Le produit est un ERP SaaS marocain unifié inspiré d’AtlasCompta, AtlasPaie et AtlasCom.
+Il doit reprendre sans exception les modules Atlas, respecter le PCM/CGNC, intégrer comptabilité, paie, commercial, fiscalité, immobilisations, analytique, budgets, reporting, documents, moteur de règles et IA transverse.
+
+==================================================
+1. DOMAINES A DECRIRE OBLIGATOIREMENT
+==================================================
+
+Tu dois détailler un par un les domaines suivants :
+
+1. Socle plateforme
+2. Comptabilité
+3. TVA et fiscalité
+4. Clôture / réouverture / à-nouveaux
+5. Paie & RH
+6. Gestion commerciale
+7. Immobilisations
+8. Analytique & budgets
+9. Reporting & pilotage
+10. Gestion documentaire
+11. Notifications
+12. Audit & traçabilité
+13. IA intégrée
+14. Moteur de règles métier
+
+==================================================
+2. POUR CHAQUE DOMAINE, JE VEUX
+==================================================
+
+Pour chaque domaine, tu dois obligatoirement fournir :
+
+- Objectif métier
+- Sous-modules
+- Fonctionnalités détaillées
+- Objets métiers principaux
+- Règles métier structurantes
+- Workflows détaillés
+- États / statuts métier
+- Écrans / interfaces principales
+- Interactions avec les autres modules
+- Points de vigilance
+- Ce qui est obligatoire en MVP
+- Ce qui peut venir après
+
+==================================================
+3. CONTRAINTES A INTEGRER
+==================================================
+
+Tu dois intégrer explicitement :
+- tous les modules AtlasCompta,
+- tous les modules AtlasPaie,
+- tous les modules AtlasCom,
+- la logique PCM / CGNC,
+- journaux,
+- exercices,
+- périodes,
+- à-nouveaux,
+- clôture,
+- réouverture,
+- TVA,
+- liasse,
+- EDI,
+- paie marocaine,
+- gestion stock,
+- analytique,
+- budgets,
+- reporting,
+- documents,
+- rôle de l’IA,
+- rôle du moteur de règles.
+
+==================================================
+4. FOCUS PARTICULIER
+==================================================
+
+Je veux un très haut niveau de détail sur :
+- cycle de vie d’une écriture comptable,
+- cycle d’exercice comptable,
+- cycle de paie,
+- cycle commercial,
+- cycle immobilisations,
+- cycle déclaratif TVA,
+- cycle liasse fiscale,
+- cycle analytique,
+- cycle de validation documentaire assistée par IA.
+
+==================================================
+5. FORMAT DE SORTIE
+==================================================
+
+Je veux :
+- une réponse en markdown,
+- avec titres et sous-titres numérotés,
+- tableaux quand c’est pertinent,
+- une profondeur maximale,
+- un niveau suffisant pour servir de base directe à l’architecture logicielle.
+
+Ne me donne pas de pseudo-résumé.
+Je veux une vraie architecture fonctionnelle complète.
+
+Commence directement.

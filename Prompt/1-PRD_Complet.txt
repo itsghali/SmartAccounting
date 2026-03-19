@@ -1,0 +1,217 @@
+Tu es un expert senior en product management ERP, architecture produit SaaS, comptabilité marocaine, paie marocaine, fiscalité marocaine, logiciels pour cabinets comptables et modélisation métier.
+
+Je veux que tu rédiges un **PRD complet (Product Requirements Document)** pour un produit appelé :
+
+# EASYACCOUNTING
+## ERP SaaS marocain unifié inspiré d’AtlasCompta, AtlasPaie et AtlasCom
+
+Le but est de construire un **ERP SaaS marocain complet**, moderne, cloud, multi-tenant, multi-sociétés, multi-dossiers, destiné à :
+- cabinets comptables,
+- fiduciaires,
+- PME marocaines,
+- groupes multi-entités.
+
+Le produit doit unifier dans une seule plateforme :
+- la comptabilité,
+- la paie,
+- la gestion commerciale,
+- la fiscalité,
+- la TVA,
+- les immobilisations,
+- l’analytique,
+- les budgets,
+- le reporting,
+- la gestion documentaire,
+- les imports/exports réglementaires,
+- et une couche IA transverse d’assistance.
+
+==================================================
+1. CONTRAINTES FONDAMENTALES
+==================================================
+
+Le PRD doit intégrer sans exception les modules Atlas suivants :
+
+### AtlasCompta
+- paramétrage comptable,
+- plan comptable marocain,
+- modèle normal,
+- modèle simplifié,
+- journaux,
+- exercices,
+- à-nouveaux,
+- clôture,
+- multi-dossiers,
+- multi-sociétés,
+- droits d’accès,
+- saisie comptable,
+- import Excel,
+- modèles d’écriture,
+- duplication,
+- équilibre des écritures,
+- TVA,
+- immobilisations,
+- analytique,
+- budgets,
+- liasse fiscale,
+- EDI XML,
+- journal,
+- grand livre,
+- balance,
+- bilan,
+- CPC,
+- états TVA,
+- export PDF/Excel,
+- utilisateurs,
+- rôles.
+
+### AtlasPaie
+- salariés,
+- informations contractuelles,
+- historique salaires,
+- catégories professionnelles,
+- brut,
+- net,
+- net vers brut,
+- brut vers net,
+- primes,
+- retenues,
+- salariés mensuels / quinzaine / hebdomadaires,
+- rubriques de paie,
+- heures supplémentaires,
+- rubriques personnalisées,
+- cotisations CNSS / CIMR / mutuelles,
+- congés,
+- absences,
+- prêts salariés,
+- IR,
+- régularisation annuelle,
+- bulletins,
+- DAMANCOM,
+- état 9421,
+- Atlas BDS,
+- import Excel/TXT,
+- conversion XML.
+
+### AtlasCom
+- clients,
+- produits,
+- familles produits,
+- codes-barres,
+- prix,
+- commandes,
+- suivi commandes,
+- facturation,
+- export PDF,
+- impression,
+- paiements,
+- règlements,
+- encaissements,
+- stock,
+- entrées,
+- sorties,
+- inventaire,
+- impression Bluetooth,
+- impression WiFi,
+- recherche clients/produits,
+- scan code-barres.
+
+==================================================
+2. CONTEXTE METIER OBLIGATOIRE
+==================================================
+
+Le produit doit respecter le contexte marocain, notamment :
+- Plan Comptable Marocain / CGNC,
+- classes 0 à 9,
+- journaux,
+- exercices,
+- périodes,
+- à-nouveaux,
+- clôture,
+- réouverture,
+- TVA collectée,
+- TVA déductible,
+- crédit de TVA,
+- immobilisations,
+- amortissements,
+- paie marocaine,
+- IR,
+- CNSS,
+- AMO,
+- CIMR,
+- liasse fiscale,
+- EDI XML,
+- analytique,
+- budgets,
+- reporting financier,
+- intégration compta / paie / commercial.
+
+==================================================
+3. REGLE SUR L’IA
+==================================================
+
+L’IA est une couche transverse d’assistance.
+Elle peut :
+- OCRiser,
+- extraire,
+- classifier,
+- suggérer,
+- pré-remplir,
+- détecter des anomalies,
+- assister à la clôture,
+- proposer des imputations,
+- assister au lettrage,
+- assister au rapprochement.
+
+Mais elle ne doit jamais seule :
+- valider une écriture officielle,
+- clôturer un exercice,
+- modifier une règle métier,
+- générer une paie définitive sans validation,
+- déposer une déclaration fiscale.
+
+==================================================
+4. CE QUE JE VEUX DANS LE PRD
+==================================================
+
+Je veux un vrai PRD détaillé avec au minimum :
+
+1. Executive summary
+2. Vision produit
+3. Problème adressé
+4. Proposition de valeur
+5. Cibles utilisateurs
+6. Personas détaillés
+7. Cas d’usage principaux
+8. Objectifs produit
+9. Non-objectifs
+10. Positionnement marché
+11. Périmètre fonctionnel complet
+12. Contraintes métier marocaines
+13. Contraintes réglementaires
+14. Rôle de l’IA
+15. Rôle du moteur de règles
+16. Principes d’architecture produit
+17. Workflows métier principaux
+18. Flux inter-modules
+19. Critères de succès
+20. Hypothèses
+21. Risques métier et produit
+22. Conclusion stratégique
+
+==================================================
+5. FORMAT DE SORTIE
+==================================================
+
+Je veux une réponse :
+- en français,
+- très détaillée,
+- en markdown,
+- professionnelle,
+- structurée,
+- réutilisable dans un dossier produit.
+
+Ne me donne pas un résumé court.
+Ne me donne pas une réponse vague.
+Je veux un PRD complet, solide et crédible.
+
+Commence directement.

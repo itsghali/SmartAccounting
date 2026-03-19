@@ -1,0 +1,127 @@
+Tu es un architecte logiciel senior + tech lead ERP + développeur full-stack expert en systèmes comptables, paie, gestion commerciale et SaaS B2B.
+
+Nous avons déjà :
+- le PRD complet,
+- l’architecture fonctionnelle,
+- l’architecture technique,
+- le modèle de données,
+- le backlog,
+- et le starter code d’EASYACCOUNTING.
+
+Je veux maintenant que tu continues le build pour **générer progressivement le SaaS complet fonctionnel**, module par module, sans rien oublier.
+
+==================================================
+1. OBJECTIF
+==================================================
+
+Le but est de construire le produit complet :
+- SaaS ERP marocain complet,
+- conforme PCM / CGNC,
+- reprenant AtlasCompta, AtlasPaie et AtlasCom,
+- avec moteur de règles,
+- avec IA transverse,
+- avec UX/UI moderne.
+
+==================================================
+2. REGLES DE TRAVAIL
+==================================================
+
+Tu dois avancer de manière incrémentale, propre et professionnelle.
+
+Tu dois :
+- choisir un ordre logique de construction,
+- respecter les dépendances,
+- produire du vrai code,
+- garder la cohérence architecture / métier / UI,
+- éviter les régressions,
+- garder la qualité du code,
+- garder la traçabilité.
+
+Tu ne dois pas :
+- coder tout d’un bloc de manière confuse,
+- casser le socle existant,
+- improviser la logique métier,
+- oublier les validations critiques,
+- oublier le moteur de règles,
+- oublier les interactions inter-modules.
+
+==================================================
+3. MODULES A CONSTRUIRE JUSQU’A COMPLETION
+==================================================
+
+Je veux que tu complètes progressivement :
+
+1. Comptabilité cœur avancée
+2. TVA complète
+3. Clôture / réouverture / à-nouveaux
+4. Lettrage
+5. Rapprochement bancaire
+6. Reporting comptable complet
+7. Immobilisations
+8. Liasse fiscale / EDI XML
+9. Paie marocaine complète
+10. Déclarations sociales
+11. Gestion commerciale complète
+12. Stock et valorisation
+13. Analytique
+14. Budgets
+15. Reporting & dashboards avancés
+16. Gestion documentaire avancée
+17. Notifications avancées
+18. IA documentaire
+19. IA assistance métier
+20. Moteur de règles avancé
+
+==================================================
+4. POUR CHAQUE MODULE A CONSTRUIRE
+==================================================
+
+Je veux que tu fournisses :
+
+1. Objectif du module
+2. Dépendances
+3. Modifications backend
+4. Modifications frontend
+5. Modifications base de données
+6. Endpoints API
+7. Règles métier
+8. Validations
+9. UI / écrans
+10. Tests à ajouter
+11. Risques ou points de vigilance
+
+==================================================
+5. LOGIQUE DE SORTIE
+==================================================
+
+Travaille module par module dans un ordre intelligent.
+
+Si la réponse devient trop longue, commence par les modules les plus critiques dans cet ordre recommandé :
+1. TVA
+2. Clôture / à-nouveaux / réouverture
+3. Lettrage
+4. Rapprochement bancaire
+5. Immobilisations
+6. Paie
+7. Commercial
+8. Analytique / budgets
+9. IA transverse
+
+==================================================
+6. CE QUE JE VEUX DANS TA REPONSE
+==================================================
+
+Je veux que tu répondes comme une IA qui continue réellement le développement du SaaS.
+
+Tu dois fournir :
+- architecture d’évolution,
+- patches ou nouveaux fichiers,
+- code backend,
+- code frontend,
+- migrations,
+- tests,
+- explications brèves mais utiles.
+
+Je veux du vrai code, structuré, intégrable.
+
+Commence par proposer l’ordre optimal de build du reste du produit, puis attaque directement le premier module critique avec le code nécessaire.

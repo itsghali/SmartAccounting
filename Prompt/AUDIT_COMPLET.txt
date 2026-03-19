@@ -1,0 +1,205 @@
+1. ANALYSE DETAILLEE DE L'ETAT ACTUEL
+1.1 Ce qui est reellement present et fonctionnel
+Backend (FastAPI) — 4 modules operationnels :
+
+Module	Endpoints	Etat
+Auth	POST /register, POST /login, GET /me	Fonctionnel. JWT access/refresh, argon2, creation atomique tenant+company+dossier+role+user
+Tenant	GET/POST /companies, GET/POST /dossiers	Fonctionnel. CRUD basique filtre par tenant_id
+Core	GET/POST /fiscal-years, GET /periods, POST /lock, GET /audit-logs	Fonctionnel. Auto-generation 12 periodes mensuelles + OD
+Accounting	GET/POST /accounts, GET/POST /journals, GET/POST /entries, POST /validate, POST /reverse, GET/POST /third-parties	Fonctionnel. Equilibre debit/credit, contrepassation, piece_number auto
+Frontend (Next.js) — 6 pages :
+
+Page	Branchee au backend	Etat
+Dashboard	NON	Placeholders statiques "—"
+Dossiers	OUI	Liste + creation fonctionnels
+Plan comptable	OUI	Liste + creation fonctionnels
+Journaux	OUI	Liste + creation fonctionnels
+Ecritures	OUI	Saisie multi-lignes, validation, contrepassation — le plus complet
+Parametres	NON	Placeholder texte uniquement
+1.2 Probleme principal visible : le Dashboard
+Le dashboard affiche 4 cartes avec value: "—" en dur dans le code (dashboard/page.tsx:7-12). Ce sont des constantes statiques, pas des variables. Aucun appel API n'est fait. La raison est simple :
+
+Aucun endpoint d'agregation n'existe cote backend
+Aucun useQuery n'est present dans la page dashboard
+Les valeurs sont un tableau JavaScript hardcode
+La section "Activite recente" est egalement un placeholder statique.
+
+1.3 Ce qui est seulement maquette
+Dashboard : 100% maquette, zero donnees reelles
+Page Parametres : texte placeholder, aucune fonctionnalite
+Dossier switcher : fonctionne en UI mais ne persiste pas correctement dans certains cas (localStorage only)
+1.4 Ce qui est absent
+Fonctionnalite	Statut
+Seed PCM/CGNC complet	Absent — les comptes sont crees manuellement un par un
+Seed journaux par defaut	Absent
+Balance generale	Absent
+Grand livre	Absent
+Bilan / CPC	Absent
+Declaration TVA	Absent
+Cloture / a-nouveaux / reouverture	Absent (seul lock_period existe)
+Immobilisations	Absent
+Lettrage	Modele present (lettrage_code) mais aucune logique
+Rapprochement bancaire	Absent
+Analytique	Absent
+Budgets	Absent
+Modeles d'ecritures	Absent
+Import/export ecritures	Absent
+Paie marocaine	Absent
+Gestion commerciale	Absent
+Stock	Absent
+Documents/GED	Modeles DB presents mais aucun endpoint
+Notifications	Absent
+Moteur de regles	Absent
+IA transverse	Absent
+RLS PostgreSQL	Absent — filtrage par WHERE tenant_id = seulement
+2. COMPARAISON AVEC LE CAHIER DES CHARGES
+Bloc	Attendu	Etat	Verdict
+Socle plateforme (multi-tenant, auth, RBAC, dossiers)	Multi-tenant, JWT, RBAC, dossier switcher	Auth + tenant + dossier OK, RBAC basique, pas de RLS	Partiellement conforme
+Comptabilite generale (PCM, journaux, ecritures, validation)	Plan comptable CGNC, 6 types journaux, saisie equilibree	Saisie + validation + contrepassation OK, mais pas de seed PCM	Partiellement conforme
+TVA	Declarations, taux, periodes, liquidation	Champ default_tva_rate sur Account, rien d'autre	Absent
+Cloture / reouverture / a-nouveaux	Workflow complet multi-etapes	Seul lock_period existe, pas de cloture exercice ni a-nouveaux	Insuffisant
+Immobilisations	CRUD, amortissements, cessions, dotations	Rien	Absent
+Analytique	Axes, sections, ventilation par ligne	Rien	Absent
+Budgets	Previsionnel par compte/periode, suivi ecarts	Rien	Absent
+Reporting	Balance, grand livre, bilan, CPC, journaux, liasse	Rien	Absent
+Paie marocaine	Salaries, rubriques, calcul, bulletins, declarations	Rien	Absent
+Declarations sociales	DAMANCOM, etat 9421, BDS	Rien	Absent
+Commercial	Clients, produits, devis, factures, paiements	Tiers basique existe (nom, ICE)	Insuffisant
+Stock	Articles, mouvements, valorisation	Rien	Absent
+Documents/GED	Upload, liaison, OCR	Modeles DB presents, aucun endpoint	Insuffisant
+Audit log	Traçabilite complete	Fonctionnel sur entries, pas sur toutes les entites	Partiellement conforme
+Notifications	Temps reel, alertes metier	Rien	Absent
+Moteur de regles	Regles parametrables, calculs auto	Rien	Absent
+IA transverse	OCR, suggestions, detection anomalies	Rien	Absent
+Score global : ~15% du cahier des charges implemente.
+
+3. COMPARAISON AVEC ATLAS
+AtlasCompta
+Fonction	Couverture
+Plan comptable PCM pre-charge	Non — saisie manuelle
+Journaux standards pre-configures	Non
+Saisie d'ecritures multi-lignes	OUI
+Validation / brouillard	OUI
+Contrepassation	OUI
+Equilibre debit/credit	OUI
+Piece number auto	OUI
+Balance generale	Non
+Grand livre	Non
+Bilan	Non
+CPC	Non
+Declaration TVA	Non
+Cloture / a-nouveaux	Non
+Lettrage	Schema present, logique absente
+Rapprochement bancaire	Non
+Import ecritures	Non
+Couverture AtlasCompta : ~25%
+
+AtlasPaie
+Couverture : 0% — aucun module paie
+
+AtlasCom
+Couverture : ~5% — seul le modele ThirdParty existe avec champs basiques
+
+4. COMPARAISON AVEC LES EXIGENCES MAROCAINES
+Exigence	Etat
+PCM / CGNC (classes 1-9, plan normalise)	Structure OK (classes 1-9 dans le modele) mais aucun seed du plan marocain officiel
+Exercices comptables	Fonctionnel — creation avec 12 periodes + OD
+Periodes mensuelles	Fonctionnel
+Journaux reglementaires (achat, vente, tresorerie, OD, AN, situation)	Types definis dans le modele, mais pas de seed automatique
+Numerotation chronologique	Piece number auto-genere (JOURNAL-PERIODE-SEQUENCE)
+Equilibre debit/credit	Controle strict a la saisie
+Immutabilite apres validation	Oui — ImmutableEntryError
+Contrepassation (pas de suppression)	Oui
+TVA marocaine (20%, 14%, 10%, 7%, 0%)	Champ taux sur Account, rien de plus
+Declaration TVA	Absente
+IR / paie	Absent
+CNSS / AMO	Absent
+DAMANCOM	Absent
+Etat 9421	Absent
+BDS annuel	Absent
+Liasse fiscale	Absente
+A-nouveaux	Absent
+Cloture definitive	Absente
+5. ECARTS ET PROBLEMES CRITIQUES
+Dashboard mort — aucune metrique reelle, impression de produit inacheve
+Pas de seed PCM — chaque dossier demarre vide, inutilisable pour un comptable
+Pas de reporting — aucun etat de sortie (balance, grand livre, bilan, CPC)
+Pas de cloture — workflow exercice incomplet
+Pas de TVA — aucune logique de declaration
+Pas de RLS — securite multi-tenant par code applicatif seulement
+15 modules absents sur 17 du cahier des charges
+UX trop minimale — tableaux sans pagination, pas de filtres, pas de recherche
+6. CE QU'IL FAUT GARDER
+Architecture monolithe modulaire bien decoupee (auth / tenant / core / accounting)
+Pattern async SQLAlchemy avec lazy="raise" + selectinload explicite — correct et performant
+Logique metier comptable solide : equilibre, validation, contrepassation, periodes
+Shell UI propre : sidebar, dossier switcher, layout responsive
+Page ecritures complete : formulaire multi-lignes, calcul temps reel, validation inline
+Types/Schemas bien structures (Pydantic + TypeScript)
+Audit log fonctionnel
+Decimal safety respecte (NUMERIC en DB, Decimal en Python, string en JSON)
+7. CE QU'IL FAUT REFONDRE OU COMPLETER
+Element	Action
+Dashboard	Refondre — brancher sur vraies metriques + activite recente
+Seed PCM/CGNC	Ajouter — script de seed du plan comptable marocain officiel
+Seed journaux	Ajouter — journaux par defaut a la creation du dossier
+Reporting	Creer — balance, grand livre, bilan, CPC
+Cloture	Creer — workflow complet cloture/a-nouveaux/reouverture
+TVA	Creer — module complet
+Page parametres	Implementer — settings reels du dossier
+Pagination/filtres	Ajouter — sur toutes les listes
+8. ROADMAP REALISTE
+Phase	Contenu	Duree estimee
+Sprint 1	Dashboard vivant + seed PCM + seed journaux	1 semaine
+Sprint 2	Balance generale + Grand livre	1 semaine
+Sprint 3	Bilan + CPC + export PDF	1-2 semaines
+Sprint 4	Cloture exercice + a-nouveaux + reouverture	1-2 semaines
+Sprint 5	Module TVA complet	1-2 semaines
+Sprint 6	Lettrage + rapprochement bancaire	1-2 semaines
+Sprint 7	Immobilisations + amortissements	2 semaines
+Sprint 8	Analytique + budgets	2 semaines
+Sprint 9	Paie marocaine (modeles + calcul)	3-4 semaines
+Sprint 10	Commercial + facturation	3-4 semaines
+Sprint 11	Documents/GED + imports/exports	2 semaines
+Sprint 12	IA + automatisations	2-3 semaines
+9. PRIORISATION SPRINTS (BLOCS 1-7)
+Bloc 1 — Fondations critiques (MAINTENANT)
+Endpoint GET /api/v1/accounting/dashboard-stats avec compteurs reels
+Frontend dashboard branche sur l'API
+Activite recente branchee sur audit logs reels
+Seed PCM/CGNC a la creation du dossier
+Seed journaux par defaut
+Bloc 2 — Comptabilite coeur exploitable
+Modeles d'ecritures (templates)
+Import ecritures (CSV/Excel)
+Pagination + filtres sur toutes les listes
+Recherche dans le plan comptable
+Bloc 3 — Reporting reglementaire
+Balance generale
+Grand livre
+Journal centralise
+Bilan
+CPC
+Export PDF/Excel
+Bloc 4 — Cloture et TVA
+Cloture d'exercice
+Generation a-nouveaux
+Reouverture
+Module TVA (declaration, liquidation)
+Bloc 5 — Paie marocaine
+(comme decrit dans le cahier des charges)
+
+Bloc 6 — Gestion commerciale
+(comme decrit dans le cahier des charges)
+
+Bloc 7 — IA et automatisations
+(comme decrit dans le cahier des charges)
+
+10-11. PREMIERE ETAPE : DASHBOARD VIVANT
+Je vais maintenant implementer le correctif le plus visible : brancher le dashboard sur de vraies metriques.
+
+Plan :
+
+Nouveau endpoint backend GET /api/v1/accounting/dashboard-stats?dossier_id=...
+Nouveau endpoint backend GET /api/v1/core/audit-logs (deja existant, a utiliser)
+Refonte du frontend dashboard avec useQuery sur ces endpoints

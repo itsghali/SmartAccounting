@@ -1,0 +1,131 @@
+Tu es un lead engineer full-stack expert en FastAPI, React/Next.js, PostgreSQL, monorepo, multi-tenant SaaS et structuration de code propre.
+
+À partir du PRD, de l’architecture fonctionnelle, de l’architecture technique et du backlog d’EASYACCOUNTING, je veux maintenant que tu **génères le starter code réel** du projet.
+
+==================================================
+1. OBJECTIF
+==================================================
+
+Je veux une base de code propre, structurée, extensible et sérieuse pour démarrer le développement réel du SaaS.
+
+Je ne veux pas tout le produit d’un coup.
+Je veux un **socle exécutable, robuste et bien organisé**, couvrant les fondations critiques.
+
+==================================================
+2. STACK A UTILISER
+==================================================
+
+Backend :
+- Python
+- FastAPI
+- SQLAlchemy 2.x
+- Alembic
+- PostgreSQL
+- Pydantic
+- JWT auth
+- pytest
+
+Frontend :
+- Next.js ou React
+- TypeScript
+- Tailwind CSS
+- React Query
+- Zod
+- react-hook-form
+
+Infra :
+- Docker / docker-compose
+- .env
+- README
+- linting
+- formatting
+
+==================================================
+3. CE QUE JE VEUX CODER DANS CE STARTER
+==================================================
+
+### Backend minimum
+- app FastAPI bootable
+- configuration
+- db session
+- base models
+- auth
+- users
+- roles
+- permissions
+- tenants
+- companies
+- dossiers
+- fiscal_years
+- accounting_periods
+- audit_logs
+- documents metadata
+- chart_of_accounts
+- journals
+- journal_entries
+- journal_entry_lines
+- contrôle équilibre débit/crédit
+- statut brouillon / validation
+- blocage période fermée
+- API CRUD minimale propre
+
+### Frontend minimum
+- app bootable
+- login
+- layout principal
+- sidebar
+- dashboard shell
+- navigation par domaine
+- pages CRUD simples pour :
+  - tenants / companies / dossiers
+  - plan comptable
+  - journaux
+  - écritures comptables
+- toasts / notifications pop-up
+- composants UI partagés
+
+### Infra
+- docker-compose
+- variables d’environnement
+- migrations initiales
+- README de lancement
+
+==================================================
+4. CONTRAINTES DE QUALITE
+==================================================
+
+Je veux :
+- vrai code,
+- structure modulaire,
+- aucun gros fichier monolithique,
+- code lisible,
+- architecture saine,
+- extensibilité prévue pour paie / commercial / TVA / immobilisations / analytique.
+
+Je ne veux pas :
+- pseudo-code,
+- prototype sale,
+- logique métier hardcodée inutilement,
+- fichiers géants.
+
+==================================================
+5. METHODE DE REPONSE
+==================================================
+
+Je veux que tu répondes exactement dans cet ordre :
+
+1. Hypothèses d’architecture
+2. Arborescence du projet / monorepo
+3. Backend — code complet initial
+4. Frontend — code complet initial
+5. Migrations / schéma DB initial
+6. README de lancement
+7. Étapes suivantes recommandées
+
+Quand tu donnes du code :
+- donne du vrai code,
+- module par module,
+- avec noms de fichiers,
+- dans une structure intégrable directement.
+
+Commence directement.

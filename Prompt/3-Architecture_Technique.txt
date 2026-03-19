@@ -1,0 +1,222 @@
+Tu es un architecte logiciel senior spécialisé en SaaS ERP, FastAPI, React/Next.js, PostgreSQL, multi-tenant, moteurs de règles et modélisation de systèmes complexes.
+
+À partir du PRD et de l’architecture fonctionnelle déjà définis pour EASYACCOUNTING, je veux maintenant la **conception technique complète** du produit.
+
+==================================================
+1. OBJECTIF
+==================================================
+
+Je veux que tu définisses l’architecture technique cible pour construire un ERP SaaS marocain complet, industrialisable, modulaire, scalable et maintenable.
+
+Le produit doit inclure :
+- socle SaaS,
+- comptabilité,
+- paie,
+- gestion commerciale,
+- TVA,
+- fiscalité,
+- immobilisations,
+- analytique,
+- budgets,
+- reporting,
+- documents,
+- notifications,
+- audit,
+- IA transverse,
+- moteur de règles.
+
+==================================================
+2. CE QUE JE VEUX DANS LA REPONSE
+==================================================
+
+Je veux impérativement les sections suivantes :
+
+1. Vision architecture globale
+2. Choix techniques justifiés
+3. Architecture backend détaillée
+4. Architecture frontend détaillée
+5. Architecture API
+6. Architecture sécurité / auth / RBAC
+7. Architecture multi-tenant
+8. Architecture documentaire
+9. Architecture des notifications
+10. Architecture reporting / exports
+11. Architecture IA
+12. Architecture du moteur de règles
+13. Modèle de données de haut niveau
+14. Relations principales entre entités
+15. Stratégie migrations / versioning
+16. Stratégie audit log
+17. Stratégie tests
+18. Stratégie observabilité / logs
+19. Stratégie jobs async
+20. Risques techniques majeurs
+
+==================================================
+3. STACK SOUHAITEE
+==================================================
+
+Sauf raison sérieuse, pars sur :
+
+Backend :
+- Python
+- FastAPI
+- SQLAlchemy 2.x
+- Alembic
+- PostgreSQL
+- Pydantic
+- JWT ou sessions sécurisées
+- pytest
+
+Frontend :
+- Next.js ou React
+- TypeScript
+- Tailwind CSS
+- React Query
+- Zod
+- react-hook-form
+
+Infra :
+- Docker / docker-compose
+- .env
+- logs
+- linting
+- formatting
+- README
+- migrations
+
+==================================================
+4. DATA MODEL OBLIGATOIRE
+==================================================
+
+Je veux une proposition de modèle de données pour au minimum :
+
+Socle :
+- tenants
+- cabinets
+- companies
+- dossiers
+- fiscal_years
+- accounting_periods
+- users
+- roles
+- permissions
+- user_assignments
+- audit_logs
+- documents
+- attachments
+- notifications
+- settings
+
+Comptabilité :
+- chart_of_accounts
+- journals
+- journal_entries
+- journal_entry_lines
+- third_parties
+- lettrage_groups
+- bank_reconciliations
+- tva_declarations
+- opening_entries
+- closing_entries
+- recurring_entry_models
+
+Paie :
+- employees
+- contracts
+- payroll_periods
+- payroll_items
+- payroll_formulas
+- payroll_runs
+- payroll_lines
+- social_organisms
+- leave_requests
+- absences
+- employee_loans
+- payslips
+- social_declarations
+
+Commercial :
+- customers
+- suppliers
+- products
+- product_categories
+- pricing_rules
+- quotations
+- orders
+- deliveries
+- invoices
+- invoice_lines
+- credit_notes
+- payments
+- warehouses
+- stock_movements
+- stock_adjustments
+
+Immobilisations :
+- fixed_assets
+- asset_categories
+- depreciation_plans
+- depreciation_entries
+- asset_disposals
+
+Analytique / budgets :
+- analytic_axes
+- analytic_centers
+- analytic_allocations
+- allocation_keys
+- budgets
+- budget_lines
+
+Règles :
+- accounting_rules
+- tax_rules
+- payroll_rules
+- analytic_rules
+- budgeting_rules
+- workflow_rules
+- rule_versions
+
+IA :
+- document_extractions
+- classification_results
+- ai_suggestions
+- review_tasks
+- anomaly_flags
+- confidence_scores
+
+==================================================
+5. MOTEUR DE REGLES
+==================================================
+
+Je veux que tu détailles le moteur de règles comme un vrai sous-système :
+- rôle,
+- structure,
+- catégories de règles,
+- versioning,
+- date d’effet,
+- priorité,
+- simulation,
+- journal de décision,
+- interface d’administration,
+- interaction avec l’IA,
+- interaction avec les modules ERP,
+- ce qui est déterministe,
+- ce qui est suggéré seulement.
+
+==================================================
+6. FORMAT DE SORTIE
+==================================================
+
+Je veux :
+- markdown,
+- très détaillé,
+- propre,
+- structuré,
+- directement exploitable par une équipe technique.
+
+Ne me donne pas du pseudo-code.
+Ne me donne pas un schéma flou.
+Je veux une vraie architecture technique détaillée.
+
+Commence directement.
