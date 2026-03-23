@@ -3,8 +3,8 @@ import uuid
 from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
-from app.dependencies import get_current_user, require_roles
+from app.database import get_app_db
+from app.dependencies import get_current_user, require_permission
 from app.tenant.schemas import (
     CompanyCreate,
     CompanyResponse,
@@ -29,7 +29,7 @@ router = APIRouter(prefix="/tenant", tags=["tenant"])
 @router.get("/companies", response_model=list[CompanyResponse])
 async def get_companies(
     current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     return await list_companies(db, current_user["tenant_id"])
 
@@ -37,8 +37,8 @@ async def get_companies(
 @router.post("/companies", response_model=CompanyResponse, status_code=201)
 async def post_company(
     data: CompanyCreate,
-    current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("admin.dossiers.manage")),
+    db: AsyncSession = Depends(get_app_db),
 ):
     return await create_company(db, current_user["tenant_id"], data)
 
@@ -47,7 +47,7 @@ async def post_company(
 async def get_company_detail(
     company_id: str,
     current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     return await get_company(db, current_user["tenant_id"], uuid.UUID(company_id))
 
@@ -56,8 +56,8 @@ async def get_company_detail(
 async def put_company(
     company_id: str,
     data: CompanyUpdate,
-    current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("admin.dossiers.manage")),
+    db: AsyncSession = Depends(get_app_db),
 ):
     return await update_company(db, current_user["tenant_id"], uuid.UUID(company_id), data)
 
@@ -65,7 +65,7 @@ async def put_company(
 @router.get("/dossiers", response_model=list[DossierResponse])
 async def get_dossiers(
     current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     return await list_dossiers(db, current_user["tenant_id"])
 
@@ -73,8 +73,8 @@ async def get_dossiers(
 @router.post("/dossiers", response_model=DossierResponse, status_code=201)
 async def post_dossier(
     data: DossierCreate,
-    current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("admin.dossiers.manage")),
+    db: AsyncSession = Depends(get_app_db),
 ):
     return await create_dossier(db, current_user["tenant_id"], data)
 
@@ -83,7 +83,7 @@ async def post_dossier(
 async def get_dossier_detail(
     dossier_id: str,
     current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     return await get_dossier(db, current_user["tenant_id"], uuid.UUID(dossier_id))
 
@@ -94,8 +94,8 @@ async def get_dossier_detail(
 )
 async def delete_dossier_route(
     dossier_id: str,
-    current_user=Depends(require_roles("Administrateur", "Responsable")),
-    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("admin.dossiers.manage")),
+    db: AsyncSession = Depends(get_app_db),
 ):
     await delete_dossier(db, current_user["tenant_id"], uuid.UUID(dossier_id))
     return Response(status_code=status.HTTP_204_NO_CONTENT)

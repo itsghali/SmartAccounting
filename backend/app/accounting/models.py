@@ -6,6 +6,7 @@ from sqlalchemy import (
     Boolean,
     Date,
     ForeignKey,
+    ForeignKeyConstraint,
     Integer,
     Numeric,
     String,
@@ -45,7 +46,13 @@ class Account(Base, TenantMixin, TimestampMixin):
     parent_number: Mapped[str | None] = mapped_column(String(10), nullable=True)
 
     __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "dossier_id"],
+            ["dossiers.tenant_id", "dossiers.id"],
+            name="fk_accounts_dossier_tenant",
+        ),
         UniqueConstraint("dossier_id", "number", name="uq_account_dossier_number"),
+        UniqueConstraint("tenant_id", "id", name="uq_accounts_tenant_id_id"),
     )
 
 
@@ -68,7 +75,18 @@ class Journal(Base, TenantMixin, TimestampMixin):
     )
 
     __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "dossier_id"],
+            ["dossiers.tenant_id", "dossiers.id"],
+            name="fk_journals_dossier_tenant",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "counterpart_account_id"],
+            ["accounts.tenant_id", "accounts.id"],
+            name="fk_journals_counterpart_account_tenant",
+        ),
         UniqueConstraint("dossier_id", "code", name="uq_journal_dossier_code"),
+        UniqueConstraint("tenant_id", "id", name="uq_journals_tenant_id_id"),
     )
 
 
@@ -94,6 +112,20 @@ class ThirdParty(Base, TenantMixin, TimestampMixin):
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     default_account_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=True
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "dossier_id"],
+            ["dossiers.tenant_id", "dossiers.id"],
+            name="fk_third_parties_dossier_tenant",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "default_account_id"],
+            ["accounts.tenant_id", "accounts.id"],
+            name="fk_third_parties_default_account_tenant",
+        ),
+        UniqueConstraint("tenant_id", "id", name="uq_third_parties_tenant_id_id"),
     )
 
 
@@ -124,10 +156,40 @@ class JournalEntry(Base, TenantMixin, TimestampMixin):
     )
 
     lines: Mapped[list["JournalEntryLine"]] = relationship(
-        back_populates="entry", lazy="raise", cascade="all, delete-orphan"
+        back_populates="entry",
+        lazy="raise",
+        cascade="all, delete-orphan",
+        foreign_keys="JournalEntryLine.entry_id",
     )
-    journal: Mapped["Journal"] = relationship(lazy="raise")
-    period: Mapped["AccountingPeriod"] = relationship(lazy="raise")
+    journal: Mapped["Journal"] = relationship(lazy="raise", foreign_keys=[journal_id])
+    period: Mapped["AccountingPeriod"] = relationship(
+        lazy="raise",
+        foreign_keys=[period_id],
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "dossier_id"],
+            ["dossiers.tenant_id", "dossiers.id"],
+            name="fk_journal_entries_dossier_tenant",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "journal_id"],
+            ["journals.tenant_id", "journals.id"],
+            name="fk_journal_entries_journal_tenant",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "period_id"],
+            ["accounting_periods.tenant_id", "accounting_periods.id"],
+            name="fk_journal_entries_period_tenant",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "reversal_of_id"],
+            ["journal_entries.tenant_id", "journal_entries.id"],
+            name="fk_journal_entries_reversal_tenant",
+        ),
+        UniqueConstraint("tenant_id", "id", name="uq_journal_entries_tenant_id_id"),
+    )
 
     @property
     def total_debit(self) -> Decimal:
@@ -171,5 +233,28 @@ class JournalEntryLine(Base, TenantMixin):
     )
     lettrage_code: Mapped[str | None] = mapped_column(String(10), nullable=True)
 
-    entry: Mapped["JournalEntry"] = relationship(back_populates="lines")
-    account: Mapped["Account"] = relationship(lazy="raise")
+    entry: Mapped["JournalEntry"] = relationship(
+        back_populates="lines",
+        foreign_keys=[entry_id],
+    )
+    account: Mapped["Account"] = relationship(lazy="raise", foreign_keys=[account_id])
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "entry_id"],
+            ["journal_entries.tenant_id", "journal_entries.id"],
+            ondelete="CASCADE",
+            name="fk_journal_entry_lines_entry_tenant",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "account_id"],
+            ["accounts.tenant_id", "accounts.id"],
+            name="fk_journal_entry_lines_account_tenant",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "third_party_id"],
+            ["third_parties.tenant_id", "third_parties.id"],
+            name="fk_journal_entry_lines_third_party_tenant",
+        ),
+        UniqueConstraint("tenant_id", "id", name="uq_journal_entry_lines_tenant_id_id"),
+    )

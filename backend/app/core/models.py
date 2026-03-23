@@ -5,9 +5,11 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Integer,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -34,7 +36,19 @@ class FiscalYear(Base, TenantMixin, TimestampMixin):
     )  # CREATED, OPEN, PRE_CLOSING, CLOSED, REOPENED
 
     periods: Mapped[list["AccountingPeriod"]] = relationship(
-        back_populates="fiscal_year", lazy="raise", order_by="AccountingPeriod.start_date"
+        back_populates="fiscal_year",
+        lazy="raise",
+        order_by="AccountingPeriod.period_number",
+        foreign_keys="AccountingPeriod.fiscal_year_id",
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "dossier_id"],
+            ["dossiers.tenant_id", "dossiers.id"],
+            name="fk_fiscal_years_dossier_tenant",
+        ),
+        UniqueConstraint("tenant_id", "id", name="uq_fiscal_years_tenant_id_id"),
     )
 
 
@@ -58,7 +72,24 @@ class AccountingPeriod(Base, TenantMixin, TimestampMixin):
         String(20), default="OPEN"
     )  # OPEN, LOCKED, CLOSED
 
-    fiscal_year: Mapped["FiscalYear"] = relationship(back_populates="periods")
+    fiscal_year: Mapped["FiscalYear"] = relationship(
+        back_populates="periods",
+        foreign_keys=[fiscal_year_id],
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "fiscal_year_id"],
+            ["fiscal_years.tenant_id", "fiscal_years.id"],
+            name="fk_accounting_periods_fiscal_year_tenant",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "dossier_id"],
+            ["dossiers.tenant_id", "dossiers.id"],
+            name="fk_accounting_periods_dossier_tenant",
+        ),
+        UniqueConstraint("tenant_id", "id", name="uq_accounting_periods_tenant_id_id"),
+    )
 
 
 class AuditLog(Base, TenantMixin):
@@ -81,6 +112,10 @@ class AuditLog(Base, TenantMixin):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_audit_logs_tenant_id_id"),
+    )
+
 
 class Document(Base, TenantMixin, TimestampMixin):
     __tablename__ = "documents"
@@ -94,8 +129,12 @@ class Document(Base, TenantMixin, TimestampMixin):
     storage_path: Mapped[str] = mapped_column(String(1000), nullable=False)
     checksum_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_documents_tenant_id_id"),
+    )
 
-class DocumentLink(Base):
+
+class DocumentLink(Base, TenantMixin, TimestampMixin):
     __tablename__ = "document_links"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -106,3 +145,13 @@ class DocumentLink(Base):
     )
     entity_type: Mapped[str] = mapped_column(String(100), nullable=False)
     entity_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "document_id"],
+            ["documents.tenant_id", "documents.id"],
+            ondelete="CASCADE",
+            name="fk_document_links_document_tenant",
+        ),
+        UniqueConstraint("tenant_id", "id", name="uq_document_links_tenant_id_id"),
+    )

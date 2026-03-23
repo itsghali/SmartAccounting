@@ -1,11 +1,11 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { useCurrentDossier } from "@/hooks/use-dossier";
 import { formatAmount } from "@/lib/utils";
-import type { FiscalYear } from "@/types";
+import type { AccountingPeriod, FiscalYear } from "@/types";
 
 interface CPCEntry {
   account_number: string;
@@ -33,6 +33,9 @@ interface CPCData {
   impots_sur_resultats: string;
   resultat_avant_impots: string;
   resultat_net: string;
+  eligible_accounts_count: number;
+  non_cpc_accounts_count: number;
+  diagnostic_message: string | null;
 }
 
 function CPCSection({
@@ -48,21 +51,24 @@ function CPCSection({
 }) {
   if (entries.length === 0 && parseFloat(total) === 0) return null;
   const bg = type === "produit" ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800";
+
   return (
     <div className="mb-2">
       <div className={`px-4 py-2 font-semibold text-xs uppercase tracking-wide ${bg}`}>
         {title}
       </div>
-      {entries.map((e) => (
+      {entries.map((entry) => (
         <div
-          key={e.account_number}
+          key={entry.account_number}
           className="flex justify-between px-4 py-1.5 text-sm border-b border-gray-100"
         >
           <span>
-            <span className="font-mono text-gray-400 mr-2 text-xs">{e.account_number}</span>
-            {e.account_label}
+            <span className="font-mono text-gray-400 mr-2 text-xs">
+              {entry.account_number}
+            </span>
+            {entry.account_label}
           </span>
-          <span className="font-mono">{formatAmount(e.montant)}</span>
+          <span className="font-mono">{formatAmount(entry.montant)}</span>
         </div>
       ))}
       <div className="flex justify-between px-4 py-2 font-bold text-sm bg-gray-50">
@@ -83,6 +89,7 @@ function ResultRow({
   size?: "normal" | "large";
 }) {
   const isPositive = parseFloat(value) >= 0;
+
   return (
     <div
       className={`flex justify-between px-4 py-3 font-bold border-t-2 ${
@@ -90,9 +97,7 @@ function ResultRow({
       }`}
     >
       <span>{label}</span>
-      <span
-        className={`font-mono ${isPositive ? "text-green-700" : "text-red-700"}`}
-      >
+      <span className={`font-mono ${isPositive ? "text-green-700" : "text-red-700"}`}>
         {formatAmount(value)}
       </span>
     </div>
@@ -102,6 +107,8 @@ function ResultRow({
 export default function CPCPage() {
   const { dossierId } = useCurrentDossier();
   const [fiscalYearId, setFiscalYearId] = useState("");
+  const [periodId, setPeriodId] = useState("");
+  const [validatedOnly, setValidatedOnly] = useState(true);
 
   const { data: fiscalYears } = useQuery<FiscalYear[]>({
     queryKey: ["fiscal-years", dossierId],
@@ -110,13 +117,25 @@ export default function CPCPage() {
     enabled: !!dossierId,
   });
 
+  const { data: periods } = useQuery<AccountingPeriod[]>({
+    queryKey: ["cpc-periods", fiscalYearId],
+    queryFn: async () =>
+      (await api.get(`/core/fiscal-years/${fiscalYearId}/periods`)).data,
+    enabled: !!fiscalYearId,
+  });
+
+  useEffect(() => {
+    setPeriodId("");
+  }, [fiscalYearId]);
+
   const queryParams = new URLSearchParams({ dossier_id: dossierId || "" });
   if (fiscalYearId) queryParams.set("fiscal_year_id", fiscalYearId);
+  if (periodId) queryParams.set("period_id", periodId);
+  queryParams.set("validated_only", String(validatedOnly));
 
   const { data: cpc, isLoading } = useQuery<CPCData>({
-    queryKey: ["cpc", dossierId, fiscalYearId],
-    queryFn: async () =>
-      (await api.get(`/reporting/cpc?${queryParams}`)).data,
+    queryKey: ["cpc", dossierId, fiscalYearId, periodId, validatedOnly],
+    queryFn: async () => (await api.get(`/reporting/cpc?${queryParams}`)).data,
     enabled: !!dossierId,
   });
 
@@ -126,25 +145,51 @@ export default function CPCPage() {
         <h1 className="text-2xl font-bold">Compte de Produits et Charges (CPC)</h1>
       </div>
 
-      {/* Filter */}
-      <div className="bg-white border rounded-lg p-4 mb-6 flex items-center gap-4">
+      <div className="bg-white border rounded-lg p-4 mb-6 flex flex-wrap items-end gap-4">
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">
             Exercice fiscal
           </label>
           <select
             value={fiscalYearId}
-            onChange={(e) => setFiscalYearId(e.target.value)}
+            onChange={(event) => setFiscalYearId(event.target.value)}
             className="h-9 border rounded-md px-2 text-sm min-w-[200px]"
           >
             <option value="">Tous les exercices</option>
-            {fiscalYears?.map((fy) => (
-              <option key={fy.id} value={fy.id}>
-                {fy.name} ({fy.status})
+            {fiscalYears?.map((fiscalYear) => (
+              <option key={fiscalYear.id} value={fiscalYear.id}>
+                {fiscalYear.name} ({fiscalYear.status})
               </option>
             ))}
           </select>
         </div>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Periode</label>
+          <select
+            value={periodId}
+            onChange={(event) => setPeriodId(event.target.value)}
+            className="h-9 border rounded-md px-2 text-sm min-w-[180px]"
+            disabled={!fiscalYearId}
+          >
+            <option value="">Toutes les periodes</option>
+            {periods?.map((period) => (
+              <option key={period.id} value={period.id}>
+                {period.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <label className="inline-flex items-center gap-2 text-sm text-gray-600">
+          <input
+            type="checkbox"
+            checked={validatedOnly}
+            onChange={(event) => setValidatedOnly(event.target.checked)}
+            className="rounded border-gray-300"
+          />
+          Ecritures validees uniquement
+        </label>
       </div>
 
       {isLoading ? (
@@ -154,72 +199,84 @@ export default function CPCPage() {
           Aucune donnee disponible.
         </div>
       ) : (
-        <div className="bg-white border rounded-lg overflow-hidden">
-          {/* I — Exploitation */}
-          <div className="bg-brand-900 text-white px-4 py-2 font-bold text-sm uppercase tracking-wider">
-            I — Resultat d'exploitation
-          </div>
-          <CPCSection
-            title="Produits d'exploitation"
-            entries={cpc.produits_exploitation}
-            total={cpc.total_produits_exploitation}
-            type="produit"
-          />
-          <CPCSection
-            title="Charges d'exploitation"
-            entries={cpc.charges_exploitation}
-            total={cpc.total_charges_exploitation}
-            type="charge"
-          />
-          <ResultRow label="RESULTAT D'EXPLOITATION" value={cpc.resultat_exploitation} />
-
-          {/* II — Financier */}
-          <div className="bg-brand-900 text-white px-4 py-2 font-bold text-sm uppercase tracking-wider mt-2">
-            II — Resultat financier
-          </div>
-          <CPCSection
-            title="Produits financiers"
-            entries={cpc.produits_financiers}
-            total={cpc.total_produits_financiers}
-            type="produit"
-          />
-          <CPCSection
-            title="Charges financieres"
-            entries={cpc.charges_financieres}
-            total={cpc.total_charges_financieres}
-            type="charge"
-          />
-          <ResultRow label="RESULTAT FINANCIER" value={cpc.resultat_financier} />
-
-          {/* III — Courant */}
-          <ResultRow label="RESULTAT COURANT" value={cpc.resultat_courant} />
-
-          {/* IV — Non courant */}
-          <div className="bg-brand-900 text-white px-4 py-2 font-bold text-sm uppercase tracking-wider mt-2">
-            IV — Resultat non courant
-          </div>
-          <CPCSection
-            title="Produits non courants"
-            entries={cpc.produits_non_courants}
-            total={cpc.total_produits_non_courants}
-            type="produit"
-          />
-          <CPCSection
-            title="Charges non courantes"
-            entries={cpc.charges_non_courantes}
-            total={cpc.total_charges_non_courantes}
-            type="charge"
-          />
-          <ResultRow label="RESULTAT NON COURANT" value={cpc.resultat_non_courant} />
-
-          {/* V — Impots + Resultat net */}
-          <div className="mt-2">
-            <ResultRow label="RESULTAT AVANT IMPOTS" value={cpc.resultat_avant_impots} />
-            <div className="flex justify-between px-4 py-2 text-sm bg-gray-50">
-              <span>Impots sur les resultats</span>
-              <span className="font-mono">{formatAmount(cpc.impots_sur_resultats)}</span>
+        <div className="space-y-4">
+          {cpc.diagnostic_message && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p className="font-medium mb-1">Diagnostic CPC</p>
+              <p>{cpc.diagnostic_message}</p>
+              <p className="mt-2 text-xs text-amber-700">
+                Comptes eligibles CPC: {cpc.eligible_accounts_count} | Mouvements hors
+                CPC: {cpc.non_cpc_accounts_count}
+              </p>
             </div>
-            <ResultRow label="RESULTAT NET DE L'EXERCICE" value={cpc.resultat_net} size="large" />
+          )}
+
+          <div className="bg-white border rounded-lg overflow-hidden">
+            <div className="bg-brand-900 text-white px-4 py-2 font-bold text-sm uppercase tracking-wider">
+              I — Resultat d'exploitation
+            </div>
+            <CPCSection
+              title="Produits d'exploitation"
+              entries={cpc.produits_exploitation}
+              total={cpc.total_produits_exploitation}
+              type="produit"
+            />
+            <CPCSection
+              title="Charges d'exploitation"
+              entries={cpc.charges_exploitation}
+              total={cpc.total_charges_exploitation}
+              type="charge"
+            />
+            <ResultRow label="RESULTAT D'EXPLOITATION" value={cpc.resultat_exploitation} />
+
+            <div className="bg-brand-900 text-white px-4 py-2 font-bold text-sm uppercase tracking-wider mt-2">
+              II — Resultat financier
+            </div>
+            <CPCSection
+              title="Produits financiers"
+              entries={cpc.produits_financiers}
+              total={cpc.total_produits_financiers}
+              type="produit"
+            />
+            <CPCSection
+              title="Charges financieres"
+              entries={cpc.charges_financieres}
+              total={cpc.total_charges_financieres}
+              type="charge"
+            />
+            <ResultRow label="RESULTAT FINANCIER" value={cpc.resultat_financier} />
+
+            <ResultRow label="RESULTAT COURANT" value={cpc.resultat_courant} />
+
+            <div className="bg-brand-900 text-white px-4 py-2 font-bold text-sm uppercase tracking-wider mt-2">
+              IV — Resultat non courant
+            </div>
+            <CPCSection
+              title="Produits non courants"
+              entries={cpc.produits_non_courants}
+              total={cpc.total_produits_non_courants}
+              type="produit"
+            />
+            <CPCSection
+              title="Charges non courantes"
+              entries={cpc.charges_non_courantes}
+              total={cpc.total_charges_non_courantes}
+              type="charge"
+            />
+            <ResultRow label="RESULTAT NON COURANT" value={cpc.resultat_non_courant} />
+
+            <div className="mt-2">
+              <ResultRow label="RESULTAT AVANT IMPOTS" value={cpc.resultat_avant_impots} />
+              <div className="flex justify-between px-4 py-2 text-sm bg-gray-50">
+                <span>Impots sur les resultats</span>
+                <span className="font-mono">{formatAmount(cpc.impots_sur_resultats)}</span>
+              </div>
+              <ResultRow
+                label="RESULTAT NET DE L'EXERCICE"
+                value={cpc.resultat_net}
+                size="large"
+              />
+            </div>
           </div>
         </div>
       )}

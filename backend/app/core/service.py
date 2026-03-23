@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.models import AccountingPeriod, AuditLog, FiscalYear
 from app.core.schemas import FiscalYearCreate
+from app.shared.dates import ensure_not_past_business_date
 from app.shared.exceptions import BadRequestError, NotFoundError
 from app.tenant.models import Dossier
 
@@ -32,6 +33,8 @@ async def create_fiscal_year(
     db: AsyncSession, tenant_id: uuid.UUID, data: FiscalYearCreate
 ) -> FiscalYear:
     await _ensure_dossier_exists(db, tenant_id, data.dossier_id)
+    ensure_not_past_business_date(data.start_date, "date de debut")
+    ensure_not_past_business_date(data.end_date, "date de fin")
 
     if data.end_date <= data.start_date:
         raise BadRequestError(

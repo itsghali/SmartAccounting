@@ -8,7 +8,15 @@ class Settings(BaseSettings):
     VERSION: str = "0.1.0"
 
     # Database
-    DATABASE_URL: str = "postgresql+asyncpg://easy:easy@localhost:5432/easyaccounting"
+    DATABASE_URL: str = (
+        "postgresql+asyncpg://easy_app:easy_app@localhost:5432/easyaccounting"
+    )
+    AUTH_DATABASE_URL: str = (
+        "postgresql+asyncpg://easy_auth:easy_auth@localhost:5432/easyaccounting"
+    )
+    ALEMBIC_DATABASE_URL: str = (
+        "postgresql+asyncpg://easy_owner:easy_owner@localhost:5432/easyaccounting"
+    )
     DATABASE_ECHO: bool = False
 
     # Auth / JWT

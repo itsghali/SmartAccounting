@@ -4,15 +4,20 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.auth.models import Role, User, UserRole
-from app.auth.schemas import PasswordChange, ProfileUpdate, RegisterRequest, UserCreateRequest
+from app.accounting.seed import seed_dossier_defaults
+from app.auth.models import Permission, Role, RolePermission, User, UserRole
+from app.auth.schemas import (
+    PasswordChange,
+    ProfileUpdate,
+    RegisterRequest,
+    UserCreateRequest,
+)
 from app.auth.security import (
     create_access_token,
     create_refresh_token,
     hash_password,
     verify_password,
 )
-from app.accounting.seed import seed_dossier_defaults
 from app.shared.exceptions import BadRequestError, NotFoundError
 from app.tenant.models import Company, Dossier, Tenant
 
@@ -22,10 +27,78 @@ SYSTEM_ROLE_DEFINITIONS: list[tuple[str, str]] = [
     ("Collaborateur", "Acces operationnel standard"),
 ]
 
+PERMISSION_DEFINITIONS: list[tuple[str, str, str]] = [
+    ("admin.users.manage", "Gestion des utilisateurs du tenant", "admin"),
+    ("admin.roles.read", "Consultation des roles systeme", "admin"),
+    ("admin.dossiers.manage", "Gestion des societes et dossiers", "admin"),
+    ("admin.seed", "Seed et maintenance des donnees systeme", "admin"),
+    ("comptabilite.write", "Creation et modification des donnees comptables", "comptabilite"),
+    ("comptabilite.validate", "Validation et contrepassation des ecritures", "comptabilite"),
+    ("tva.read", "Consultation de la TVA", "tva"),
+    ("tva.manage", "Parametrage TVA", "tva"),
+    ("tva.liquidate", "Liquidation TVA", "tva"),
+    ("closing.read", "Consultation des workflows de cloture", "closing"),
+    ("closing.execute", "Execution des operations de cloture", "closing"),
+    ("closing.reopen", "Reouverture des exercices clotures", "closing"),
+    ("templates.manage", "Gestion des modeles d'ecritures", "accounting"),
+    ("imports.execute", "Execution des imports comptables", "accounting"),
+    ("central_journal.read", "Consultation du journal central", "accounting"),
+    ("fixed_assets.read", "Consultation des immobilisations", "fixed_assets"),
+    ("fixed_assets.manage", "Gestion des immobilisations", "fixed_assets"),
+    ("fixed_assets.post", "Generation des dotations et ecritures", "fixed_assets"),
+]
+
+ROLE_PERMISSION_CODES: dict[str, set[str]] = {
+    "Administrateur": {code for code, _, _ in PERMISSION_DEFINITIONS},
+    "Responsable": {code for code, _, _ in PERMISSION_DEFINITIONS},
+    "Collaborateur": {
+        "comptabilite.write",
+        "closing.read",
+        "tva.read",
+        "central_journal.read",
+        "fixed_assets.read",
+    },
+}
+
+
+def normalize_email(email: str) -> str:
+    return email.strip().lower()
+
+
+def _user_load_options():
+    return (
+        selectinload(User.user_roles)
+        .selectinload(UserRole.role)
+        .selectinload(Role.permissions)
+        .selectinload(RolePermission.permission),
+    )
+
+
+async def ensure_permission_catalog(
+    db: AsyncSession,
+) -> dict[str, Permission]:
+    result = await db.execute(select(Permission))
+    existing_permissions = {permission.code: permission for permission in result.scalars().all()}
+
+    for code, description, module in PERMISSION_DEFINITIONS:
+        if code not in existing_permissions:
+            permission = Permission(
+                code=code,
+                description=description,
+                module=module,
+            )
+            db.add(permission)
+            await db.flush()
+            existing_permissions[code] = permission
+
+    return existing_permissions
+
 
 async def ensure_system_roles(
     db: AsyncSession, tenant_id: uuid.UUID
 ) -> dict[str, Role]:
+    permissions = await ensure_permission_catalog(db)
+
     result = await db.execute(
         select(Role).where(Role.tenant_id == tenant_id)
     )
@@ -43,12 +116,40 @@ async def ensure_system_roles(
             await db.flush()
             existing_roles[role_name] = role
 
+    existing_role_permissions = await db.execute(
+        select(RolePermission).where(RolePermission.tenant_id == tenant_id)
+    )
+    existing_pairs = {
+        (role_permission.role_id, role_permission.permission_id)
+        for role_permission in existing_role_permissions.scalars().all()
+    }
+
+    for role_name, permission_codes in ROLE_PERMISSION_CODES.items():
+        role = existing_roles[role_name]
+        for code in permission_codes:
+            permission = permissions[code]
+            pair = (role.id, permission.id)
+            if pair in existing_pairs:
+                continue
+
+            db.add(
+                RolePermission(
+                    tenant_id=tenant_id,
+                    role_id=role.id,
+                    permission_id=permission.id,
+                )
+            )
+            existing_pairs.add(pair)
+
+    await db.flush()
     return existing_roles
 
 
 async def register_user(db: AsyncSession, data: RegisterRequest) -> dict:
+    normalized_email = normalize_email(data.email)
+
     existing = await db.execute(
-        select(User).where(User.email == data.email)
+        select(User).where(User.email == normalized_email)
     )
     if existing.scalar_one_or_none():
         raise BadRequestError("Email already registered")
@@ -82,7 +183,7 @@ async def register_user(db: AsyncSession, data: RegisterRequest) -> dict:
 
     user = User(
         tenant_id=tenant.id,
-        email=data.email,
+        email=normalized_email,
         password_hash=hash_password(data.password),
         first_name=data.first_name,
         last_name=data.last_name,
@@ -90,7 +191,7 @@ async def register_user(db: AsyncSession, data: RegisterRequest) -> dict:
     db.add(user)
     await db.flush()
 
-    user_role = UserRole(user_id=user.id, role_id=admin_role.id)
+    user_role = UserRole(tenant_id=tenant.id, user_id=user.id, role_id=admin_role.id)
     db.add(user_role)
     await db.flush()
 
@@ -107,10 +208,12 @@ async def register_user(db: AsyncSession, data: RegisterRequest) -> dict:
 async def authenticate_user(
     db: AsyncSession, email: str, password: str
 ) -> dict:
+    normalized_email = normalize_email(email)
+
     result = await db.execute(
         select(User)
-        .where(User.email == email)
-        .options(selectinload(User.user_roles).selectinload(UserRole.role))
+        .where(User.email == normalized_email)
+        .options(*_user_load_options())
     )
     user = result.scalar_one_or_none()
 
@@ -153,7 +256,7 @@ async def ensure_user_has_system_role(db: AsyncSession, user: User) -> User:
         else roles["Collaborateur"]
     )
 
-    db.add(UserRole(user_id=user.id, role_id=default_role.id))
+    db.add(UserRole(tenant_id=user.tenant_id, user_id=user.id, role_id=default_role.id))
     await db.flush()
     return await get_user_by_id(db, user.id)
 
@@ -163,7 +266,7 @@ async def list_users(db: AsyncSession, tenant_id: uuid.UUID) -> list[User]:
         select(User)
         .where(User.tenant_id == tenant_id)
         .order_by(User.first_name, User.last_name, User.email)
-        .options(selectinload(User.user_roles).selectinload(UserRole.role))
+        .options(*_user_load_options())
     )
     return list(result.scalars().unique().all())
 
@@ -179,11 +282,10 @@ async def create_user(
     data: UserCreateRequest,
     actor_role_names: set[str] | None = None,
 ) -> User:
+    normalized_email = normalize_email(data.email)
+
     existing = await db.execute(
-        select(User).where(
-            User.tenant_id == tenant_id,
-            User.email == data.email,
-        )
+        select(User).where(User.email == normalized_email)
     )
     if existing.scalar_one_or_none():
         raise BadRequestError("Un utilisateur avec cet email existe deja")
@@ -192,6 +294,7 @@ async def create_user(
     role = roles.get(data.role_name)
     if not role:
         raise BadRequestError("Role invalide")
+
     if actor_role_names is not None and "Administrateur" not in actor_role_names:
         if data.role_name in {"Administrateur", "Responsable"}:
             raise BadRequestError(
@@ -200,7 +303,7 @@ async def create_user(
 
     user = User(
         tenant_id=tenant_id,
-        email=data.email,
+        email=normalized_email,
         password_hash=hash_password(data.password),
         first_name=data.first_name,
         last_name=data.last_name,
@@ -209,7 +312,7 @@ async def create_user(
     db.add(user)
     await db.flush()
 
-    db.add(UserRole(user_id=user.id, role_id=role.id))
+    db.add(UserRole(tenant_id=tenant_id, user_id=user.id, role_id=role.id))
     await db.flush()
 
     return await get_user_by_id(db, user.id)
@@ -218,10 +321,13 @@ async def create_user(
 async def update_profile(
     db: AsyncSession, user: User, data: ProfileUpdate
 ) -> User:
-    for field, value in data.model_dump(exclude_unset=True).items():
+    payload = data.model_dump(exclude_unset=True)
+    if "email" in payload and payload["email"] is not None:
+        payload["email"] = normalize_email(payload["email"])
+
+    for field, value in payload.items():
         setattr(user, field, value)
     await db.flush()
-    # Reload with roles
     return await get_user_by_id(db, user.id)
 
 
@@ -238,7 +344,7 @@ async def get_user_by_id(db: AsyncSession, user_id: uuid.UUID) -> User:
     result = await db.execute(
         select(User)
         .where(User.id == user_id)
-        .options(selectinload(User.user_roles).selectinload(UserRole.role))
+        .options(*_user_load_options())
     )
     user = result.scalar_one_or_none()
     if not user:

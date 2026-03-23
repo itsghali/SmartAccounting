@@ -7,7 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCurrentDossier } from "@/hooks/use-dossier";
 import api from "@/lib/api";
-import { formatDate, formatNumber } from "@/lib/utils";
+import {
+  formatDate,
+  formatNumber,
+  getTodayBusinessDateValue,
+  isPastBusinessDate,
+  maxDateValue,
+} from "@/lib/utils";
 import { toast } from "sonner";
 import type { AccountingPeriod, DashboardStats, FiscalYear } from "@/types";
 
@@ -43,17 +49,22 @@ function periodVariant(
 }
 
 function defaultFiscalYearForm() {
-  const year = new Date().getFullYear();
+  const today = getTodayBusinessDateValue();
+  const currentYear = Number(today.slice(0, 4));
+  const endOfCurrentYear = `${currentYear}-12-31`;
+  const fallbackEndDate =
+    endOfCurrentYear > today ? endOfCurrentYear : `${currentYear + 1}-12-31`;
   return {
-    name: `Exercice ${year}`,
-    start_date: `${year}-01-01`,
-    end_date: `${year}-12-31`,
+    name: `Exercice ${currentYear}`,
+    start_date: today,
+    end_date: fallbackEndDate,
   };
 }
 
 export default function ExercicesPage() {
   const queryClient = useQueryClient();
   const { dossierId, currentDossier } = useCurrentDossier();
+  const todayDate = getTodayBusinessDateValue();
   const [showForm, setShowForm] = useState(false);
   const [selectedFyId, setSelectedFyId] = useState("");
   const [form, setForm] = useState(defaultFiscalYearForm);
@@ -177,6 +188,18 @@ export default function ExercicesPage() {
             className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end"
             onSubmit={(event) => {
               event.preventDefault();
+              if (isPastBusinessDate(form.start_date)) {
+                toast.error("La date de debut ne peut pas etre anterieure a la date du jour.");
+                return;
+              }
+              if (isPastBusinessDate(form.end_date)) {
+                toast.error("La date de fin ne peut pas etre anterieure a la date du jour.");
+                return;
+              }
+              if (form.end_date <= form.start_date) {
+                toast.error("La date de fin doit etre posterieure a la date de debut.");
+                return;
+              }
               createFiscalYear.mutate(form);
             }}
           >
@@ -199,6 +222,7 @@ export default function ExercicesPage() {
                 onChange={(event) =>
                   setForm((prev) => ({ ...prev, start_date: event.target.value }))
                 }
+                min={todayDate}
                 required
               />
             </div>
@@ -210,6 +234,7 @@ export default function ExercicesPage() {
                 onChange={(event) =>
                   setForm((prev) => ({ ...prev, end_date: event.target.value }))
                 }
+                min={maxDateValue(todayDate, form.start_date)}
                 required
               />
             </div>

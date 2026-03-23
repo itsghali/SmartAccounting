@@ -13,7 +13,7 @@ from app.accounting.reporting import (
     get_cpc,
     get_grand_livre,
 )
-from app.database import get_db
+from app.database import get_app_db
 from app.dependencies import get_current_user
 
 router = APIRouter(prefix="/reporting", tags=["reporting"])
@@ -26,7 +26,7 @@ async def balance_generale(
     period_id: uuid.UUID | None = None,
     validated_only: bool = True,
     current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     return await get_balance_generale(
         db,
@@ -46,7 +46,7 @@ async def grand_livre(
     period_id: uuid.UUID | None = None,
     validated_only: bool = True,
     current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     return await get_grand_livre(
         db,
@@ -65,7 +65,7 @@ async def bilan(
     fiscal_year_id: uuid.UUID | None = None,
     validated_only: bool = True,
     current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     return await get_bilan(
         db,
@@ -80,14 +80,16 @@ async def bilan(
 async def cpc(
     dossier_id: uuid.UUID = Query(...),
     fiscal_year_id: uuid.UUID | None = None,
+    period_id: uuid.UUID | None = None,
     validated_only: bool = True,
     current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     return await get_cpc(
         db,
         current_user["tenant_id"],
         dossier_id,
         fiscal_year_id=fiscal_year_id,
+        period_id=period_id,
         validated_only=validated_only,
     )

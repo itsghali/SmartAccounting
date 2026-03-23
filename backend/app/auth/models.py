@@ -1,6 +1,14 @@
 import uuid
 
-from sqlalchemy import Boolean, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    ForeignKey,
+    ForeignKeyConstraint,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -21,10 +29,16 @@ class User(Base, TenantMixin, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     mfa_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
-    user_roles: Mapped[list["UserRole"]] = relationship(back_populates="user", lazy="raise")
+    user_roles: Mapped[list["UserRole"]] = relationship(
+        back_populates="user",
+        lazy="raise",
+        foreign_keys="UserRole.user_id",
+    )
 
     __table_args__ = (
-        UniqueConstraint("tenant_id", "email", name="uq_user_tenant_email"),
+        CheckConstraint("email = lower(email)", name="ck_users_email_lowercase"),
+        UniqueConstraint("email", name="uq_users_email"),
+        UniqueConstraint("tenant_id", "id", name="uq_users_tenant_id_id"),
     )
 
 
@@ -39,11 +53,14 @@ class Role(Base, TenantMixin, TimestampMixin):
     is_system: Mapped[bool] = mapped_column(Boolean, default=False)
 
     permissions: Mapped[list["RolePermission"]] = relationship(
-        back_populates="role", lazy="raise"
+        back_populates="role",
+        lazy="raise",
+        foreign_keys="RolePermission.role_id",
     )
 
     __table_args__ = (
         UniqueConstraint("tenant_id", "name", name="uq_role_tenant_name"),
+        UniqueConstraint("tenant_id", "id", name="uq_roles_tenant_id_id"),
     )
 
 
@@ -58,7 +75,7 @@ class Permission(Base):
     module: Mapped[str] = mapped_column(String(50), nullable=False)
 
 
-class RolePermission(Base):
+class RolePermission(Base, TenantMixin):
     __tablename__ = "role_permissions"
 
     role_id: Mapped[uuid.UUID] = mapped_column(
@@ -68,11 +85,29 @@ class RolePermission(Base):
         UUID(as_uuid=True), ForeignKey("permissions.id", ondelete="CASCADE"), primary_key=True
     )
 
-    role: Mapped["Role"] = relationship(back_populates="permissions")
+    role: Mapped["Role"] = relationship(
+        back_populates="permissions",
+        foreign_keys=[role_id],
+    )
     permission: Mapped["Permission"] = relationship()
 
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "role_id"],
+            ["roles.tenant_id", "roles.id"],
+            ondelete="CASCADE",
+            name="fk_role_permissions_role_tenant",
+        ),
+        UniqueConstraint(
+            "tenant_id",
+            "role_id",
+            "permission_id",
+            name="uq_role_permissions_tenant_role_permission",
+        ),
+    )
 
-class UserRole(Base):
+
+class UserRole(Base, TenantMixin):
     __tablename__ = "user_roles"
 
     user_id: Mapped[uuid.UUID] = mapped_column(
@@ -82,11 +117,35 @@ class UserRole(Base):
         UUID(as_uuid=True), ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True
     )
 
-    user: Mapped["User"] = relationship(back_populates="user_roles")
-    role: Mapped["Role"] = relationship()
+    user: Mapped["User"] = relationship(
+        back_populates="user_roles",
+        foreign_keys=[user_id],
+    )
+    role: Mapped["Role"] = relationship(foreign_keys=[role_id])
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "user_id"],
+            ["users.tenant_id", "users.id"],
+            ondelete="CASCADE",
+            name="fk_user_roles_user_tenant",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "role_id"],
+            ["roles.tenant_id", "roles.id"],
+            ondelete="CASCADE",
+            name="fk_user_roles_role_tenant",
+        ),
+        UniqueConstraint(
+            "tenant_id",
+            "user_id",
+            "role_id",
+            name="uq_user_roles_tenant_user_role",
+        ),
+    )
 
 
-class UserDossierAssignment(Base, TimestampMixin):
+class UserDossierAssignment(Base, TenantMixin, TimestampMixin):
     __tablename__ = "user_dossier_assignments"
 
     user_id: Mapped[uuid.UUID] = mapped_column(
@@ -94,4 +153,25 @@ class UserDossierAssignment(Base, TimestampMixin):
     )
     dossier_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("dossiers.id", ondelete="CASCADE"), primary_key=True
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "user_id"],
+            ["users.tenant_id", "users.id"],
+            ondelete="CASCADE",
+            name="fk_user_dossier_assignments_user_tenant",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "dossier_id"],
+            ["dossiers.tenant_id", "dossiers.id"],
+            ondelete="CASCADE",
+            name="fk_user_dossier_assignments_dossier_tenant",
+        ),
+        UniqueConstraint(
+            "tenant_id",
+            "user_id",
+            "dossier_id",
+            name="uq_user_dossier_assignments_tenant_user_dossier",
+        ),
     )

@@ -23,11 +23,14 @@ class TenantMiddleware(BaseHTTPMiddleware):
                 payload = decode_token(token)
                 request.state.tenant_id = payload.get("tid")
                 request.state.user_id = payload.get("sub")
+                request.state.role = payload.get("role")
             except Exception:
                 request.state.tenant_id = None
                 request.state.user_id = None
+                request.state.role = None
         else:
             request.state.tenant_id = None
             request.state.user_id = None
+            request.state.role = None
 
         return await call_next(request)

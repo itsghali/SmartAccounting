@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.models import AuditLog
 from app.core.schemas import AuditLogResponse, FiscalYearCreate, FiscalYearResponse, PeriodResponse
 from app.core.service import create_fiscal_year, get_fiscal_year, list_fiscal_years, lock_period
-from app.database import get_db
-from app.dependencies import get_current_user
+from app.database import get_app_db
+from app.dependencies import get_current_user, require_permission
 
 router = APIRouter(prefix="/core", tags=["core"])
 
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/core", tags=["core"])
 async def get_fiscal_years(
     dossier_id: uuid.UUID = Query(...),
     current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     return await list_fiscal_years(db, current_user["tenant_id"], dossier_id)
 
@@ -25,8 +25,8 @@ async def get_fiscal_years(
 @router.post("/fiscal-years", response_model=FiscalYearResponse, status_code=201)
 async def post_fiscal_year(
     data: FiscalYearCreate,
-    current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("closing.execute")),
+    db: AsyncSession = Depends(get_app_db),
 ):
     return await create_fiscal_year(db, current_user["tenant_id"], data)
 
@@ -35,7 +35,7 @@ async def post_fiscal_year(
 async def get_fiscal_year_detail(
     fy_id: uuid.UUID,
     current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     return await get_fiscal_year(db, current_user["tenant_id"], fy_id)
 
@@ -44,7 +44,7 @@ async def get_fiscal_year_detail(
 async def get_periods(
     fy_id: uuid.UUID,
     current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     fy = await get_fiscal_year(db, current_user["tenant_id"], fy_id)
     return fy.periods
@@ -53,8 +53,8 @@ async def get_periods(
 @router.post("/periods/{period_id}/lock", response_model=PeriodResponse)
 async def post_lock_period(
     period_id: uuid.UUID,
-    current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("closing.execute")),
+    db: AsyncSession = Depends(get_app_db),
 ):
     return await lock_period(db, current_user["tenant_id"], period_id)
 
@@ -65,7 +65,7 @@ async def get_audit_logs(
     entity_id: str | None = None,
     limit: int = Query(default=50, le=200),
     current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     query = select(AuditLog).where(
         AuditLog.tenant_id == current_user["tenant_id"]

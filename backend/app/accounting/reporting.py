@@ -13,6 +13,44 @@ from app.accounting.models import Account, JournalEntry, JournalEntryLine
 from app.core.models import AccountingPeriod, FiscalYear
 
 
+def _entry_scope_conditions(
+    tenant_id: uuid.UUID,
+    dossier_id: uuid.UUID,
+    validated_only: bool,
+    fiscal_year_id: uuid.UUID | None = None,
+    period_id: uuid.UUID | None = None,
+) -> list:
+    conditions = [
+        JournalEntry.tenant_id == tenant_id,
+        JournalEntry.dossier_id == dossier_id,
+    ]
+    if validated_only:
+        conditions.append(JournalEntry.status == "VALIDATED")
+    if period_id:
+        conditions.append(JournalEntry.period_id == period_id)
+    elif fiscal_year_id:
+        conditions.append(
+            JournalEntry.period_id.in_(
+                select(AccountingPeriod.id).where(
+                    AccountingPeriod.fiscal_year_id == fiscal_year_id
+                )
+            )
+        )
+    return conditions
+
+
+def _signed_cpc_amount(line: dict) -> Decimal:
+    total_debit = Decimal(line["total_debit"])
+    total_credit = Decimal(line["total_credit"])
+    account_class = line["account_class"]
+
+    if account_class == 6:
+        return total_debit - total_credit
+    if account_class == 7:
+        return total_credit - total_debit
+    return Decimal("0.00")
+
+
 # ──────────────────── Balance Generale ────────────────────
 
 
@@ -29,24 +67,13 @@ async def get_balance_generale(
     Only includes accounts that have at least one movement.
     """
     # Base conditions for entries
-    entry_conditions = [
-        JournalEntry.tenant_id == tenant_id,
-        JournalEntry.dossier_id == dossier_id,
-    ]
-    if validated_only:
-        entry_conditions.append(JournalEntry.status == "VALIDATED")
-
-    if period_id:
-        entry_conditions.append(JournalEntry.period_id == period_id)
-    elif fiscal_year_id:
-        # Get all periods for this fiscal year
-        entry_conditions.append(
-            JournalEntry.period_id.in_(
-                select(AccountingPeriod.id).where(
-                    AccountingPeriod.fiscal_year_id == fiscal_year_id
-                )
-            )
-        )
+    entry_conditions = _entry_scope_conditions(
+        tenant_id=tenant_id,
+        dossier_id=dossier_id,
+        validated_only=validated_only,
+        fiscal_year_id=fiscal_year_id,
+        period_id=period_id,
+    )
 
     query = (
         select(
@@ -114,23 +141,13 @@ async def get_grand_livre(
     Grand livre: detail des mouvements par compte.
     Returns accounts with their individual entry lines.
     """
-    entry_conditions = [
-        JournalEntry.tenant_id == tenant_id,
-        JournalEntry.dossier_id == dossier_id,
-    ]
-    if validated_only:
-        entry_conditions.append(JournalEntry.status == "VALIDATED")
-
-    if period_id:
-        entry_conditions.append(JournalEntry.period_id == period_id)
-    elif fiscal_year_id:
-        entry_conditions.append(
-            JournalEntry.period_id.in_(
-                select(AccountingPeriod.id).where(
-                    AccountingPeriod.fiscal_year_id == fiscal_year_id
-                )
-            )
-        )
+    entry_conditions = _entry_scope_conditions(
+        tenant_id=tenant_id,
+        dossier_id=dossier_id,
+        validated_only=validated_only,
+        fiscal_year_id=fiscal_year_id,
+        period_id=period_id,
+    )
 
     account_conditions = [
         Account.tenant_id == tenant_id,
@@ -301,6 +318,7 @@ async def get_cpc(
     tenant_id: uuid.UUID,
     dossier_id: uuid.UUID,
     fiscal_year_id: uuid.UUID | None = None,
+    period_id: uuid.UUID | None = None,
     validated_only: bool = True,
 ) -> dict:
     """
@@ -309,7 +327,11 @@ async def get_cpc(
     resultat financier, resultat courant, resultat non courant, resultat net.
     """
     balance = await get_balance_generale(
-        db, tenant_id, dossier_id, fiscal_year_id=fiscal_year_id,
+        db,
+        tenant_id,
+        dossier_id,
+        fiscal_year_id=fiscal_year_id,
+        period_id=period_id,
         validated_only=validated_only,
     )
 
@@ -322,35 +344,44 @@ async def get_cpc(
     produits_financiers = []    # 73xx
     produits_non_courants = []  # 75xx
 
+    eligible_accounts_count = 0
+    non_cpc_accounts_count = 0
+
     for line in balance:
         num = line["account_number"]
-        solde_d = Decimal(line["solde_debiteur"])
-        solde_c = Decimal(line["solde_crediteur"])
-        montant = solde_d if solde_d > 0 else solde_c
-
+        amount = _signed_cpc_amount(line)
         entry = {
             "account_number": num,
             "account_label": line["account_label"],
-            "montant": str(montant),
+            "montant": str(amount),
         }
 
         if num.startswith("61") or num.startswith("62"):
             charges_exploitation.append(entry)
+            eligible_accounts_count += 1
         elif num.startswith("63") or num.startswith("64"):
             charges_financieres.append(entry)
+            eligible_accounts_count += 1
         elif num.startswith("65") or num.startswith("66"):
             charges_non_courantes.append(entry)
+            eligible_accounts_count += 1
         elif num.startswith("67"):
             impots_sur_resultats.append(entry)
+            eligible_accounts_count += 1
         elif num.startswith("71") or num.startswith("72"):
             produits_exploitation.append(entry)
+            eligible_accounts_count += 1
         elif num.startswith("73") or num.startswith("74"):
             produits_financiers.append(entry)
+            eligible_accounts_count += 1
         elif num.startswith("75") or num.startswith("76"):
             produits_non_courants.append(entry)
+            eligible_accounts_count += 1
+        else:
+            non_cpc_accounts_count += 1
 
     def total_section(section: list[dict]) -> Decimal:
-        return sum(Decimal(e["montant"]) for e in section)
+        return sum((Decimal(e["montant"]) for e in section), Decimal("0.00"))
 
     t_charges_exploit = total_section(charges_exploitation)
     t_produits_exploit = total_section(produits_exploitation)
@@ -369,6 +400,16 @@ async def get_cpc(
     t_impots = total_section(impots_sur_resultats)
     resultat_avant_impots = resultat_courant + resultat_non_courant
     resultat_net = resultat_avant_impots - t_impots
+    diagnostic_message = None
+    if not balance:
+        diagnostic_message = (
+            "Aucune ecriture ne correspond au perimetre selectionne."
+        )
+    elif eligible_accounts_count == 0:
+        diagnostic_message = (
+            "Les mouvements trouves portent uniquement sur des comptes hors CPC "
+            "(classes 1 a 5, 8 ou 9). Ils impactent la balance mais pas le CPC."
+        )
 
     return {
         "produits_exploitation": [e for e in produits_exploitation],
@@ -390,4 +431,7 @@ async def get_cpc(
         "impots_sur_resultats": str(t_impots),
         "resultat_avant_impots": str(resultat_avant_impots),
         "resultat_net": str(resultat_net),
+        "eligible_accounts_count": eligible_accounts_count,
+        "non_cpc_accounts_count": non_cpc_accounts_count,
+        "diagnostic_message": diagnostic_message,
     }

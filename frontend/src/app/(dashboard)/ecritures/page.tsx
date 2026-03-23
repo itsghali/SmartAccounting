@@ -1,14 +1,20 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { useCurrentDossier } from "@/hooks/use-dossier";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/data-table";
-import { formatAmount, formatDate } from "@/lib/utils";
+import {
+  formatAmount,
+  formatDate,
+  getTodayBusinessDateValue,
+  isPastBusinessDate,
+  maxDateValue,
+} from "@/lib/utils";
 import { toast } from "sonner";
 import type { JournalEntry, Journal, Account, FiscalYear, AccountingPeriod } from "@/types";
 
@@ -22,12 +28,13 @@ interface EntryLineForm {
 export default function EcrituresPage() {
   const queryClient = useQueryClient();
   const { dossierId } = useCurrentDossier();
+  const todayDate = getTodayBusinessDateValue();
   const [showForm, setShowForm] = useState(false);
 
   // Form state
   const [journalId, setJournalId] = useState("");
   const [periodId, setPeriodId] = useState("");
-  const [entryDate, setEntryDate] = useState("");
+  const [entryDate, setEntryDate] = useState(todayDate);
   const [entryLabel, setEntryLabel] = useState("");
   const [lines, setLines] = useState<EntryLineForm[]>([
     { account_id: "", label: "", debit: "", credit: "" },
@@ -108,7 +115,7 @@ export default function EcrituresPage() {
     setShowForm(false);
     setJournalId("");
     setPeriodId("");
-    setEntryDate("");
+    setEntryDate(todayDate);
     setEntryLabel("");
     setLines([
       { account_id: "", label: "", debit: "", credit: "" },
@@ -135,8 +142,33 @@ export default function EcrituresPage() {
   const totalCredit = lines.reduce((sum, l) => sum + (parseFloat(l.credit) || 0), 0);
   const isBalanced = Math.abs(totalDebit - totalCredit) < 0.005 && totalDebit > 0;
 
+  useEffect(() => {
+    if (!periodId || !periods) return;
+    const selectedPeriod = periods.find((period) => period.id === periodId);
+    if (!selectedPeriod) return;
+
+    const recommendedDate = maxDateValue(todayDate, selectedPeriod.start_date);
+    const isCurrentDateWithinPeriod =
+      entryDate >= selectedPeriod.start_date && entryDate <= selectedPeriod.end_date;
+
+    if (!entryDate || !isCurrentDateWithinPeriod) {
+      setEntryDate(recommendedDate);
+    }
+  }, [entryDate, periodId, periods, todayDate]);
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (isPastBusinessDate(entryDate)) {
+      toast.error("La date d'ecriture ne peut pas etre anterieure a la date du jour.");
+      return;
+    }
+    const selectedPeriod = periods?.find((period) => period.id === periodId);
+    if (selectedPeriod) {
+      if (entryDate < selectedPeriod.start_date || entryDate > selectedPeriod.end_date) {
+        toast.error("La date d'ecriture doit appartenir a la periode selectionnee.");
+        return;
+      }
+    }
     createEntry.mutate({
       dossier_id: dossierId,
       journal_id: journalId,
@@ -248,7 +280,7 @@ export default function EcrituresPage() {
                 >
                   <option value="">Sélectionner</option>
                   {periods
-                    ?.filter((p) => p.status === "OPEN")
+                    ?.filter((p) => p.status === "OPEN" && p.end_date >= todayDate)
                     .map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name}
@@ -262,6 +294,11 @@ export default function EcrituresPage() {
                   type="date"
                   value={entryDate}
                   onChange={(e) => setEntryDate(e.target.value)}
+                  min={maxDateValue(
+                    todayDate,
+                    periods?.find((period) => period.id === periodId)?.start_date ?? ""
+                  )}
+                  max={periods?.find((period) => period.id === periodId)?.end_date}
                   required
                 />
               </div>

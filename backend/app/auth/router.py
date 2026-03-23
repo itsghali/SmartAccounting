@@ -20,19 +20,19 @@ from app.auth.service import (
     register_user,
     update_profile,
 )
-from app.database import get_db
-from app.dependencies import get_current_user, require_roles
+from app.database import get_app_db, get_auth_db
+from app.dependencies import get_current_user, require_permission
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=TokenResponse)
-async def register(data: RegisterRequest, db: AsyncSession = Depends(get_db)):
+async def register(data: RegisterRequest, db: AsyncSession = Depends(get_auth_db)):
     return await register_user(db, data)
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(data: LoginRequest, db: AsyncSession = Depends(get_auth_db)):
     return await authenticate_user(db, data.email, data.password)
 
 
@@ -54,7 +54,7 @@ async def me(current_user=Depends(get_current_user)):
 async def put_profile(
     data: ProfileUpdate,
     current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     user = await update_profile(db, current_user["user"], data)
     return UserResponse(
@@ -72,7 +72,7 @@ async def put_profile(
 async def post_change_password(
     data: PasswordChange,
     current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     await change_password(db, current_user["user"], data)
 
@@ -82,8 +82,8 @@ async def post_change_password(
     response_model=list[UserResponse],
 )
 async def get_users(
-    current_user=Depends(require_roles("Administrateur", "Responsable")),
-    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("admin.users.manage")),
+    db: AsyncSession = Depends(get_app_db),
 ):
     users = await list_users(db, current_user["tenant_id"])
     return [
@@ -105,8 +105,8 @@ async def get_users(
     response_model=list[RoleResponse],
 )
 async def get_roles(
-    current_user=Depends(require_roles("Administrateur", "Responsable")),
-    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("admin.roles.read")),
+    db: AsyncSession = Depends(get_app_db),
 ):
     return await list_roles(db, current_user["tenant_id"])
 
@@ -118,8 +118,8 @@ async def get_roles(
 )
 async def post_user(
     data: UserCreateRequest,
-    current_user=Depends(require_roles("Administrateur", "Responsable")),
-    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("admin.users.manage")),
+    db: AsyncSession = Depends(get_app_db),
 ):
     actor_role_names = {ur.role.name for ur in current_user["user"].user_roles}
     user = await create_user(

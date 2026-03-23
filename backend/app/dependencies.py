@@ -5,14 +5,15 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.security import decode_token
-from app.database import get_db
+from app.database import get_app_db
+from app.shared.exceptions import NotFoundError
 
 bearer_scheme = HTTPBearer()
 
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ) -> dict:
     token = credentials.credentials
     try:
@@ -31,14 +32,33 @@ async def get_current_user(
 
     from app.auth.service import ensure_user_has_system_role, get_user_by_id
 
-    user_id = uuid.UUID(payload["sub"])
-    user = await get_user_by_id(db, user_id)
+    try:
+        user_id = uuid.UUID(payload["sub"])
+        tenant_id = uuid.UUID(payload["tid"])
+    except (KeyError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token context",
+        )
+
+    try:
+        user = await get_user_by_id(db, user_id)
+    except NotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token context",
+        )
+
     user = await ensure_user_has_system_role(db, user)
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Account is disabled",
+        )
 
     return {
         "user": user,
-        "tenant_id": uuid.UUID(payload["tid"]),
-        "role": payload.get("role", ""),
+        "tenant_id": tenant_id,
     }
 
 
@@ -50,8 +70,7 @@ def current_user_has_any_role(current_user: dict, allowed_roles: set[str]) -> bo
 
 def require_permission(permission_code: str):
     async def checker(current_user: dict = Depends(get_current_user)) -> dict:
-        role = current_user["role"]
-        if role == "Administrateur":
+        if current_user_has_any_role(current_user, {"Administrateur"}):
             return current_user
 
         user = current_user["user"]

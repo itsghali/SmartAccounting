@@ -31,7 +31,7 @@ from app.accounting.service import (
     reverse_entry,
     validate_entry,
 )
-from app.database import get_db
+from app.database import get_app_db
 from app.dependencies import get_current_user, require_permission
 
 router = APIRouter(prefix="/accounting", tags=["accounting"])
@@ -44,7 +44,7 @@ router = APIRouter(prefix="/accounting", tags=["accounting"])
 async def get_stats(
     dossier_id: uuid.UUID = Query(...),
     current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     return await get_dashboard_stats(db, current_user["tenant_id"], dossier_id)
 
@@ -53,7 +53,7 @@ async def get_stats(
 async def post_seed_defaults(
     dossier_id: uuid.UUID = Query(...),
     current_user=Depends(require_permission("admin.seed")),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     """Manually seed PCM accounts and default journals for an existing dossier."""
     result = await seed_dossier_defaults(
@@ -69,7 +69,7 @@ async def post_seed_defaults(
 async def get_accounts(
     dossier_id: uuid.UUID = Query(...),
     current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     return await list_accounts(db, current_user["tenant_id"], dossier_id)
 
@@ -78,7 +78,7 @@ async def get_accounts(
 async def post_account(
     data: AccountCreate,
     current_user=Depends(require_permission("comptabilite.write")),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     return await create_account(db, current_user["tenant_id"], data)
 
@@ -87,7 +87,7 @@ async def post_account(
 async def get_account_detail(
     account_id: uuid.UUID,
     current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     return await get_account(db, current_user["tenant_id"], account_id)
 
@@ -99,7 +99,7 @@ async def get_account_detail(
 async def get_journals(
     dossier_id: uuid.UUID = Query(...),
     current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     return await list_journals(db, current_user["tenant_id"], dossier_id)
 
@@ -108,7 +108,7 @@ async def get_journals(
 async def post_journal(
     data: JournalCreate,
     current_user=Depends(require_permission("comptabilite.write")),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     return await create_journal(db, current_user["tenant_id"], data)
 
@@ -120,7 +120,7 @@ async def post_journal(
 async def get_third_parties(
     dossier_id: uuid.UUID = Query(...),
     current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     return await list_third_parties(db, current_user["tenant_id"], dossier_id)
 
@@ -129,7 +129,7 @@ async def get_third_parties(
 async def post_third_party(
     data: ThirdPartyCreate,
     current_user=Depends(require_permission("comptabilite.write")),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     return await create_third_party(db, current_user["tenant_id"], data)
 
@@ -178,7 +178,7 @@ async def get_entries(
     period_id: uuid.UUID | None = None,
     status: str | None = None,
     current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     entries = await list_journal_entries(
         db, current_user["tenant_id"], dossier_id, journal_id, period_id, status
@@ -190,7 +190,7 @@ async def get_entries(
 async def post_entry(
     data: JournalEntryCreate,
     current_user=Depends(require_permission("comptabilite.write")),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     entry = await create_journal_entry(
         db, current_user["tenant_id"], current_user["user"].id, data
@@ -202,7 +202,7 @@ async def post_entry(
 async def get_entry_detail(
     entry_id: uuid.UUID,
     current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     entry = await get_journal_entry(db, current_user["tenant_id"], entry_id)
     return _entry_to_response(entry)
@@ -212,7 +212,7 @@ async def get_entry_detail(
 async def post_validate_entry(
     entry_id: uuid.UUID,
     current_user=Depends(require_permission("comptabilite.validate")),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     entry = await validate_entry(
         db, current_user["tenant_id"], current_user["user"].id, entry_id
@@ -224,7 +224,7 @@ async def post_validate_entry(
 async def post_reverse_entry(
     entry_id: uuid.UUID,
     current_user=Depends(require_permission("comptabilite.validate")),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_app_db),
 ):
     entry = await reverse_entry(
         db, current_user["tenant_id"], current_user["user"].id, entry_id

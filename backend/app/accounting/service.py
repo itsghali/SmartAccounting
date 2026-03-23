@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 from decimal import Decimal, InvalidOperation
 
 from sqlalchemy import func, select
@@ -21,6 +22,7 @@ from app.accounting.schemas import (
 )
 from app.core.models import AccountingPeriod, FiscalYear
 from app.core.service import create_audit_log
+from app.shared.dates import ensure_not_past_business_date
 from app.shared.exceptions import (
     BadRequestError,
     ImmutableEntryError,
@@ -337,12 +339,17 @@ async def _generate_piece_number(
 
 
 async def _validate_period_is_open(
-    db: AsyncSession, tenant_id: uuid.UUID, period_id: uuid.UUID
-) -> None:
+    db: AsyncSession,
+    tenant_id: uuid.UUID,
+    dossier_id: uuid.UUID,
+    period_id: uuid.UUID,
+    entry_date: date | None = None,
+) -> AccountingPeriod:
     result = await db.execute(
         select(AccountingPeriod).where(
             AccountingPeriod.id == period_id,
             AccountingPeriod.tenant_id == tenant_id,
+            AccountingPeriod.dossier_id == dossier_id,
         )
     )
     period = result.scalar_one_or_none()
@@ -350,6 +357,73 @@ async def _validate_period_is_open(
         raise NotFoundError("Accounting period not found")
     if period.status != "OPEN":
         raise PeriodClosedError()
+    if entry_date and not (period.start_date <= entry_date <= period.end_date):
+        raise BadRequestError(
+            "La date d'ecriture doit appartenir a la periode selectionnee."
+        )
+    return period
+
+
+async def _validate_journal_belongs_to_dossier(
+    db: AsyncSession, tenant_id: uuid.UUID, dossier_id: uuid.UUID, journal_id: uuid.UUID
+) -> Journal:
+    result = await db.execute(
+        select(Journal).where(
+            Journal.id == journal_id,
+            Journal.tenant_id == tenant_id,
+            Journal.dossier_id == dossier_id,
+        )
+    )
+    journal = result.scalar_one_or_none()
+    if not journal:
+        raise NotFoundError("Journal not found for this dossier")
+    return journal
+
+
+async def _validate_entry_lines_scope(
+    db: AsyncSession,
+    tenant_id: uuid.UUID,
+    dossier_id: uuid.UUID,
+    lines: list[EntryLineCreate],
+) -> None:
+    account_ids = {line.account_id for line in lines}
+    existing_account_ids = set(
+        (
+            await db.execute(
+                select(Account.id).where(
+                    Account.tenant_id == tenant_id,
+                    Account.dossier_id == dossier_id,
+                    Account.id.in_(account_ids),
+                )
+            )
+        ).scalars()
+    )
+    if existing_account_ids != account_ids:
+        raise BadRequestError(
+            "Un ou plusieurs comptes n'appartiennent pas au dossier actif."
+        )
+
+    third_party_ids = {
+        line.third_party_id for line in lines if line.third_party_id is not None
+    }
+    if not third_party_ids:
+        return
+
+    existing_third_party_ids = set(
+        (
+            await db.execute(
+                select(ThirdParty.id).where(
+                    ThirdParty.tenant_id == tenant_id,
+                    ThirdParty.dossier_id == dossier_id,
+                    ThirdParty.id.in_(third_party_ids),
+                )
+            )
+        ).scalars()
+    )
+    if existing_third_party_ids != third_party_ids:
+        raise BadRequestError(
+            "Un ou plusieurs tiers n'appartiennent pas au dossier actif."
+        )
 
 
 def _parse_line_amount(value: str, field_name: str) -> Decimal:
@@ -366,7 +440,18 @@ async def create_journal_entry(
     db: AsyncSession, tenant_id: uuid.UUID, user_id: uuid.UUID, data: JournalEntryCreate
 ) -> JournalEntry:
     await _ensure_dossier_exists(db, tenant_id, data.dossier_id)
-    await _validate_period_is_open(db, tenant_id, data.period_id)
+    ensure_not_past_business_date(data.entry_date, "date d'ecriture")
+    await _validate_journal_belongs_to_dossier(
+        db, tenant_id, data.dossier_id, data.journal_id
+    )
+    await _validate_period_is_open(
+        db,
+        tenant_id,
+        data.dossier_id,
+        data.period_id,
+        entry_date=data.entry_date,
+    )
+    await _validate_entry_lines_scope(db, tenant_id, data.dossier_id, data.lines)
 
     # Parse and validate lines
     total_debit = Decimal("0.00")
@@ -501,7 +586,13 @@ async def validate_entry(
     if entry.status != "DRAFT":
         raise ImmutableEntryError()
 
-    await _validate_period_is_open(db, tenant_id, entry.period_id)
+    await _validate_period_is_open(
+        db,
+        tenant_id,
+        entry.dossier_id,
+        entry.period_id,
+        entry_date=entry.entry_date,
+    )
 
     if not entry.is_balanced:
         raise UnbalancedEntryError()
@@ -531,7 +622,12 @@ async def reverse_entry(
     if original.status != "VALIDATED":
         raise BadRequestError("Only validated entries can be reversed")
 
-    await _validate_period_is_open(db, tenant_id, original.period_id)
+    await _validate_period_is_open(
+        db,
+        tenant_id,
+        original.dossier_id,
+        original.period_id,
+    )
 
     piece_number = await _generate_piece_number(
         db, tenant_id, original.journal_id, original.period_id
@@ -542,6 +638,7 @@ async def reverse_entry(
         dossier_id=original.dossier_id,
         journal_id=original.journal_id,
         period_id=original.period_id,
+        # A system reversal keeps the original accounting date for traceability.
         entry_date=original.entry_date,
         piece_number=piece_number,
         label=f"Contrepassation de {original.piece_number}",
